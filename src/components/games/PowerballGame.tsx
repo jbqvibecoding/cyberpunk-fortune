@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Ticket, RefreshCw, Zap, Clock, Trophy, Play, Sparkles } from 'lucide-react';
+import { Ticket, Zap, Clock, Trophy, Play, Sparkles } from 'lucide-react';
 import { usePowerball } from '@/hooks/usePowerball';
 import { DrawAnimation } from './powerball/DrawAnimation';
 import { TicketHistory } from './powerball/TicketHistory';
 import { PrizeTiers } from './powerball/PrizeTiers';
 import { DrawHistory } from './powerball/DrawHistory';
+import { NumberSelector } from './powerball/NumberSelector';
 import { cn } from '@/lib/utils';
 
 const PowerballGame = () => {
@@ -153,129 +154,52 @@ const PowerballGame = () => {
           {/* Tab Content */}
           {activeTab === 'play' && (
             <div className="grid md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 space-y-6">
-                {/* Number Selection Grid */}
-                <div className="cyber-card p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-display text-xl font-semibold">
-                      SELECT 5 NUMBERS <span className="text-primary">(1-69)</span>
-                    </h3>
-                    <span className="font-mono text-primary">{state.selectedNumbers.length}/5</span>
-                  </div>
+              <div className="md:col-span-2">
+                <NumberSelector
+                  selectedNumbers={state.selectedNumbers}
+                  powerball={state.powerball}
+                  lastDrawNumbers={state.lastDraw?.numbers}
+                  lastDrawPowerball={state.lastDraw?.powerball}
+                  onToggleNumber={actions.toggleNumber}
+                  onTogglePowerball={actions.togglePowerball}
+                  onQuickPick={actions.quickPick}
+                  onClear={actions.clearSelection}
+                  onFillRemaining={actions.fillRemaining}
+                />
 
-                  <div className="grid grid-cols-10 sm:grid-cols-12 md:grid-cols-10 lg:grid-cols-12 gap-2 mb-8">
-                    {Array.from({ length: 69 }, (_, i) => i + 1).map(num => (
-                      <button
-                        key={num}
-                        onClick={() => actions.toggleNumber(num)}
-                        className={cn(
-                          'number-ball text-sm',
-                          state.selectedNumbers.includes(num) && 'selected'
-                        )}
-                      >
-                        {num}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Powerball Selection */}
-                  <div className="border-t border-border/50 pt-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="font-display text-xl font-semibold">
-                        SELECT POWERBALL <span className="text-secondary">(1-26)</span>
-                      </h3>
-                      <span className="font-mono text-secondary">{state.powerball ? '1/1' : '0/1'}</span>
-                    </div>
-
-                    <div className="grid grid-cols-9 sm:grid-cols-13 gap-2">
-                      {Array.from({ length: 26 }, (_, i) => i + 1).map(num => (
-                        <button
-                          key={`pb-${num}`}
-                          onClick={() => actions.togglePowerball(num)}
-                          className={cn(
-                            'number-ball powerball text-sm',
-                            state.powerball === num && 'selected'
-                          )}
-                        >
-                          {num}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Selection Display */}
-                <div className="cyber-card p-6">
-                  <h3 className="font-display text-lg mb-4">YOUR SELECTION</h3>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {[0, 1, 2, 3, 4].map(i => (
-                      <div
-                        key={i}
-                        className={cn(
-                          'w-14 h-14 rounded-full flex items-center justify-center font-display font-bold text-xl border-2',
-                          state.selectedNumbers[i]
-                            ? 'bg-primary text-primary-foreground border-primary glow-cyan'
-                            : 'bg-muted/30 border-border text-muted-foreground'
-                        )}
-                      >
-                        {state.selectedNumbers[i] || '?'}
-                      </div>
-                    ))}
-                    <div className="text-2xl text-muted-foreground font-display">+</div>
-                    <div
-                      className={cn(
-                        'w-14 h-14 rounded-full flex items-center justify-center font-display font-bold text-xl border-2',
-                        state.powerball
-                          ? 'bg-secondary text-secondary-foreground border-secondary glow-magenta'
-                          : 'bg-muted/30 border-border text-muted-foreground'
-                      )}
-                    >
-                      {state.powerball || '?'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                  <div className="flex gap-3">
-                    <button
-                      onClick={actions.quickPick}
-                      className="cyber-btn bg-muted text-foreground flex items-center gap-2 hover:bg-muted/80"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      QUICK PICK
-                    </button>
-                    <button
-                      onClick={actions.clearSelection}
-                      className="cyber-btn bg-transparent border border-border text-muted-foreground hover:text-foreground hover:border-foreground"
-                    >
-                      CLEAR
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Tickets:</span>
-                      <select
-                        value={state.ticketCount}
-                        onChange={(e) => actions.setTicketCount(Number(e.target.value))}
-                        className="bg-muted border border-border rounded px-3 py-2 font-mono text-foreground"
-                      >
+                {/* Purchase Controls */}
+                <div className="mt-6 cyber-card p-6">
+                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <span className="text-muted-foreground font-mono">TICKETS:</span>
+                      <div className="flex items-center gap-2">
                         {[1, 2, 5, 10, 20].map(n => (
-                          <option key={n} value={n}>{n}</option>
+                          <button
+                            key={n}
+                            onClick={() => actions.setTicketCount(n)}
+                            className={cn(
+                              'w-10 h-10 rounded-lg font-mono font-bold transition-all',
+                              state.ticketCount === n
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            )}
+                          >
+                            {n}
+                          </button>
                         ))}
-                      </select>
+                      </div>
                     </div>
+
                     <button
                       onClick={actions.buyTickets}
                       disabled={!isComplete}
                       className={cn(
-                        'cyber-btn-primary flex items-center gap-2',
+                        'cyber-btn-primary flex items-center gap-2 text-lg px-8 py-3',
                         !isComplete && 'opacity-50 cursor-not-allowed'
                       )}
                     >
-                      <Zap className="h-4 w-4" />
-                      BUY TICKET ({(0.01 * state.ticketCount).toFixed(2)} ETH)
+                      <Zap className="h-5 w-5" />
+                      BUY {state.ticketCount} TICKET{state.ticketCount > 1 ? 'S' : ''} ({(0.01 * state.ticketCount).toFixed(2)} ETH)
                     </button>
                   </div>
                 </div>

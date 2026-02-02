@@ -115,6 +115,26 @@ export function usePowerball() {
     }));
   }, []);
 
+  const fillRemaining = useCallback(() => {
+    setState(prev => {
+      if (prev.selectedNumbers.length >= 5) return prev;
+      
+      const remaining = 5 - prev.selectedNumbers.length;
+      const available = Array.from({ length: 69 }, (_, i) => i + 1)
+        .filter(n => !prev.selectedNumbers.includes(n))
+        .sort(() => Math.random() - 0.5);
+      
+      const newNumbers = [...prev.selectedNumbers, ...available.slice(0, remaining)].sort((a, b) => a - b);
+      const newPowerball = prev.powerball ?? Math.floor(Math.random() * 26) + 1;
+      
+      return {
+        ...prev,
+        selectedNumbers: newNumbers,
+        powerball: newPowerball,
+      };
+    });
+  }, []);
+
   const clearSelection = useCallback(() => {
     setState(prev => ({ ...prev, selectedNumbers: [], powerball: null }));
   }, []);
@@ -218,6 +238,7 @@ export function usePowerball() {
       togglePowerball,
       setTicketCount,
       quickPick,
+      fillRemaining,
       clearSelection,
       buyTickets,
       simulateDraw,
