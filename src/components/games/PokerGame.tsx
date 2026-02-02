@@ -18,14 +18,17 @@ const stakes = [
 type GameView = 'lobby' | 'table';
 
 export default function PokerGame() {
+  // All hooks must be called unconditionally at the top
   const [view, setView] = useState<GameView>('lobby');
   const [selectedStake, setSelectedStake] = useState(0);
   const [buyIn, setBuyIn] = useState(500);
   const [initialBuyIn, setInitialBuyIn] = useState(500);
   const [handHistory, setHandHistory] = useState<HandRecord[]>([]);
+  
+  // This hook MUST be called unconditionally - never inside conditions
   const { state, actions } = usePokerGame(buyIn);
 
-  // Track hand results
+  // Track hand results - useEffect at top level, conditional logic inside
   useEffect(() => {
     if (state.phase === 'finished' && state.winner) {
       const newRecord: HandRecord = {
