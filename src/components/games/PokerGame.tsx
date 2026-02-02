@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 
 const stakes = [
-  { min: 100, max: 500, label: '新手场', color: 'text-success', blinds: '5/10' },
-  { min: 500, max: 2000, label: '常规场', color: 'text-primary', blinds: '10/20' },
-  { min: 2000, max: 10000, label: '高额场', color: 'text-accent', blinds: '25/50' },
+  { min: 100, max: 500, label: 'MICRO', color: 'text-success', blinds: '5/10' },
+  { min: 500, max: 2000, label: 'LOW', color: 'text-primary', blinds: '10/20' },
+  { min: 2000, max: 10000, label: 'HIGH', color: 'text-accent', blinds: '25/50' },
 ];
 
 type GameView = 'lobby' | 'table';
@@ -41,7 +41,7 @@ export default function PokerGame() {
               className="text-muted-foreground hover:text-primary"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              返回大厅
+              Back to Lobby
             </Button>
             <div className="text-center">
               <h2 className="font-display text-2xl md:text-3xl font-bold tracking-wider">
@@ -63,15 +63,15 @@ export default function PokerGame() {
             {/* Game Info */}
             <div className="grid grid-cols-3 gap-4">
               <div className="cyber-card p-3 text-center">
-                <span className="text-xs text-muted-foreground">小盲/大盲</span>
+                <span className="text-xs text-muted-foreground">Blinds</span>
                 <p className="font-mono text-primary">5/10</p>
               </div>
               <div className="cyber-card p-3 text-center">
-                <span className="text-xs text-muted-foreground">你的筹码</span>
+                <span className="text-xs text-muted-foreground">Your Chips</span>
                 <p className="font-mono text-primary">{state.players[0]?.chips || 0}</p>
               </div>
               <div className="cyber-card p-3 text-center">
-                <span className="text-xs text-muted-foreground">AI 筹码</span>
+                <span className="text-xs text-muted-foreground">AI Chips</span>
                 <p className="font-mono text-secondary">{state.players[1]?.chips || 0}</p>
               </div>
             </div>
@@ -92,14 +92,14 @@ export default function PokerGame() {
             TEXAS HOLD'EM <span className="text-glow-magenta text-secondary">AI DUEL</span>
           </h2>
           <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
-            挑战 LLM 驱动的 AI 对手，体验头对头德州扑克。所有发牌均通过 Chainlink VRF 验证。
+            Challenge our LLM-powered AI in heads-up poker. All cards dealt via Chainlink VRF.
           </p>
         </div>
 
         <div className="max-w-3xl mx-auto">
           {/* Stake Selection */}
           <div className="cyber-card p-6 mb-6">
-            <h3 className="font-display text-xl mb-6">选择场次</h3>
+            <h3 className="font-display text-xl mb-6">SELECT STAKES</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {stakes.map((stake, i) => (
                 <button
@@ -118,10 +118,10 @@ export default function PokerGame() {
                     {stake.label}
                   </span>
                   <p className="font-mono text-sm text-muted-foreground mt-1">
-                    {stake.min} - {stake.max} 筹码
+                    {stake.min} - {stake.max} chips
                   </p>
                   <p className="font-mono text-xs text-muted-foreground">
-                    盲注: {stake.blinds}
+                    Blinds: {stake.blinds}
                   </p>
                 </button>
               ))}
@@ -130,8 +130,8 @@ export default function PokerGame() {
             {/* Buy-in Slider */}
             <div className="mb-6">
               <div className="flex justify-between mb-2">
-                <span className="text-muted-foreground">买入金额</span>
-                <span className="font-mono text-primary">{buyIn} 筹码</span>
+                <span className="text-muted-foreground">Buy-in Amount</span>
+                <span className="font-mono text-primary">{buyIn} chips</span>
               </div>
               <Slider
                 value={[buyIn]}
@@ -148,22 +148,22 @@ export default function PokerGame() {
             <div className="cyber-card p-4 flex items-center gap-3">
               <Shield className="h-6 w-6 text-success" />
               <div>
-                <span className="font-display text-sm">公平发牌</span>
-                <p className="text-xs text-muted-foreground">Chainlink VRF 验证</p>
+                <span className="font-display text-sm">PROVABLY FAIR</span>
+                <p className="text-xs text-muted-foreground">Chainlink VRF Verified</p>
               </div>
             </div>
             <div className="cyber-card p-4 flex items-center gap-3">
               <Cpu className="h-6 w-6 text-secondary" />
               <div>
-                <span className="font-display text-sm">AI 驱动</span>
-                <p className="text-xs text-muted-foreground">LLM 智能决策</p>
+                <span className="font-display text-sm">AI POWERED</span>
+                <p className="text-xs text-muted-foreground">LLM via Chainlink Functions</p>
               </div>
             </div>
             <div className="cyber-card p-4 flex items-center gap-3">
               <Clock className="h-6 w-6 text-primary" />
               <div>
-                <span className="font-display text-sm">&lt;10秒响应</span>
-                <p className="text-xs text-muted-foreground">快速 AI 决策</p>
+                <span className="font-display text-sm">&lt;10s RESPONSE</span>
+                <p className="text-xs text-muted-foreground">Fast AI Decision Making</p>
               </div>
             </div>
           </div>
@@ -175,10 +175,10 @@ export default function PokerGame() {
               className="cyber-btn-secondary text-lg flex items-center gap-3 mx-auto"
             >
               <Zap className="h-5 w-5" />
-              进入游戏 ({buyIn} 筹码)
+              ENTER GAME ({buyIn} chips)
             </button>
             <p className="text-xs text-muted-foreground mt-4">
-              进入即表示您同意智能合约规则。所有游戏记录将上链存储。
+              By entering, you agree to the smart contract rules. All games are recorded on-chain.
             </p>
           </div>
         </div>

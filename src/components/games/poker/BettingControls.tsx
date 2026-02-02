@@ -27,7 +27,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
           onClick={actions.startGame}
           className="cyber-btn-primary text-lg px-8 py-6"
         >
-          开始游戏
+          START GAME
         </Button>
       </div>
     );
@@ -43,7 +43,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
                 'font-display text-2xl',
                 state.winner.isAI ? 'text-secondary' : 'text-primary'
               )}>
-                {state.winner.name} 赢得 {state.pot} 筹码！
+                {state.winner.name} wins {state.pot} chips!
               </span>
               {state.winningHand && (
                 <p className="text-muted-foreground mt-2">
@@ -57,7 +57,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
           onClick={actions.resetGame}
           className="cyber-btn-primary"
         >
-          下一局
+          NEXT HAND
         </Button>
       </div>
     );
@@ -67,7 +67,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
     return (
       <div className={cn('flex justify-center items-center gap-2', className)}>
         <div className="animate-pulse">
-          <span className="font-display text-secondary">AI 思考中...</span>
+          <span className="font-display text-secondary">AI THINKING...</span>
         </div>
       </div>
     );
@@ -77,7 +77,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
     return (
       <div className={cn('flex justify-center', className)}>
         <span className="text-muted-foreground">
-          {currentPlayer.hasFolded ? '已弃牌' : '已全押'}
+          {currentPlayer.hasFolded ? 'FOLDED' : 'ALL-IN'}
         </span>
       </div>
     );
@@ -88,7 +88,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
       {/* Raise slider */}
       <div className="bg-card/50 rounded-lg p-4">
         <div className="flex justify-between mb-2">
-          <span className="text-sm text-muted-foreground">加注金额</span>
+          <span className="text-sm text-muted-foreground">Raise Amount</span>
           <span className="font-mono text-primary">{raiseAmount}</span>
         </div>
         <Slider
@@ -112,7 +112,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
           onClick={actions.fold}
           className="border-destructive text-destructive hover:bg-destructive/10"
         >
-          弃牌
+          FOLD
         </Button>
         
         {canCheck ? (
@@ -121,7 +121,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
             onClick={actions.check}
             className="border-muted-foreground"
           >
-            过牌
+            CHECK
           </Button>
         ) : (
           <Button
@@ -129,7 +129,7 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
             onClick={actions.call}
             className="border-primary text-primary"
           >
-            跟注 {callAmount}
+            CALL {callAmount}
           </Button>
         )}
         
@@ -138,14 +138,14 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
           className="bg-accent hover:bg-accent/90 text-accent-foreground"
           disabled={raiseAmount > maxRaise}
         >
-          加注 {raiseAmount}
+          RAISE {raiseAmount}
         </Button>
         
         <Button
           onClick={actions.allIn}
           className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
         >
-          全押 {currentPlayer.chips}
+          ALL-IN {currentPlayer.chips}
         </Button>
       </div>
     </div>

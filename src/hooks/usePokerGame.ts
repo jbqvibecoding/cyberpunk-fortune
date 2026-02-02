@@ -14,7 +14,7 @@ function createInitialState(buyIn: number): GameState {
     players: [
       {
         id: 'player',
-        name: '你',
+        name: 'YOU',
         chips: buyIn,
         cards: [],
         currentBet: 0,
@@ -27,7 +27,7 @@ function createInitialState(buyIn: number): GameState {
       },
       {
         id: 'ai',
-        name: 'AI 对手',
+        name: 'AI OPPONENT',
         chips: buyIn,
         cards: [],
         currentBet: 0,

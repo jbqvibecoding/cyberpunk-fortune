@@ -88,14 +88,14 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
         rank: 'royal-flush',
         rankValue: 10,
         highCards: straightFlush.values,
-        description: '皇家同花顺'
+        description: 'Royal Flush'
       };
     }
     return {
       rank: 'straight-flush',
       rankValue: 9,
       highCards: straightFlush.values,
-      description: `同花顺，${straightFlush.values[0]}高`
+      description: `Straight Flush, ${straightFlush.values[0]} high`
     };
   }
 
@@ -106,7 +106,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'four-of-a-kind',
       rankValue: 8,
       highCards: [counts[0].value, kicker],
-      description: `四条 ${counts[0].value}s`
+      description: `Four of a Kind, ${counts[0].value}s`
     };
   }
 
@@ -116,7 +116,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'full-house',
       rankValue: 7,
       highCards: [counts[0].value, counts[1].value],
-      description: `葫芦 ${counts[0].value}s满 ${counts[1].value}s`
+      description: `Full House, ${counts[0].value}s full of ${counts[1].value}s`
     };
   }
 
@@ -127,7 +127,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'flush',
       rankValue: 6,
       highCards: flush.map(c => getRankValue(c.rank)),
-      description: `同花，${getRankValue(flush[0].rank)}高`
+      description: `Flush, ${getRankValue(flush[0].rank)} high`
     };
   }
 
@@ -138,7 +138,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'straight',
       rankValue: 5,
       highCards: straight,
-      description: `顺子，${straight[0]}高`
+      description: `Straight, ${straight[0]} high`
     };
   }
 
@@ -149,7 +149,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'three-of-a-kind',
       rankValue: 4,
       highCards: [counts[0].value, ...kickers],
-      description: `三条 ${counts[0].value}s`
+      description: `Three of a Kind, ${counts[0].value}s`
     };
   }
 
@@ -160,7 +160,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'two-pair',
       rankValue: 3,
       highCards: [counts[0].value, counts[1].value, kicker],
-      description: `两对 ${counts[0].value}s和${counts[1].value}s`
+      description: `Two Pair, ${counts[0].value}s and ${counts[1].value}s`
     };
   }
 
@@ -171,7 +171,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'pair',
       rankValue: 2,
       highCards: [counts[0].value, ...kickers],
-      description: `一对 ${counts[0].value}s`
+      description: `Pair of ${counts[0].value}s`
     };
   }
 
@@ -181,7 +181,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
     rank: 'high-card',
     rankValue: 1,
     highCards,
-    description: `高牌 ${highCards[0]}`
+    description: `High Card ${highCards[0]}`
   };
 }
 
