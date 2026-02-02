@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePokerGame } from '@/hooks/usePokerGame';
 import { PokerTable } from './poker/PokerTable';
 import { BettingControls } from './poker/BettingControls';
-import { Cpu, Shield, Clock, Zap, ArrowLeft } from 'lucide-react';
+import { WinnerDisplay } from './poker/WinnerDisplay';
+import { HandHistory, HandRecord } from './poker/HandHistory';
+import { MatchStats } from './poker/MatchStats';
+import { Cpu, Shield, Clock, Zap, ArrowLeft, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 
@@ -18,23 +21,55 @@ export default function PokerGame() {
   const [view, setView] = useState<GameView>('lobby');
   const [selectedStake, setSelectedStake] = useState(0);
   const [buyIn, setBuyIn] = useState(500);
+  const [initialBuyIn, setInitialBuyIn] = useState(500);
+  const [handHistory, setHandHistory] = useState<HandRecord[]>([]);
   const { state, actions } = usePokerGame(buyIn);
+
+  // Track hand results
+  useEffect(() => {
+    if (state.phase === 'finished' && state.winner) {
+      const newRecord: HandRecord = {
+        id: `hand-${Date.now()}`,
+        winner: state.winner.isAI ? 'ai' : 'player',
+        pot: state.pot,
+        handDescription: state.winningHand?.description || null,
+        timestamp: new Date(),
+      };
+      setHandHistory(prev => [newRecord, ...prev]);
+    }
+  }, [state.phase, state.winner, state.pot, state.winningHand]);
 
   const handleEnterGame = () => {
     setView('table');
+    setInitialBuyIn(buyIn);
+    setHandHistory([]);
   };
 
   const handleBackToLobby = () => {
     setView('lobby');
     actions.resetGame();
+    setHandHistory([]);
+  };
+
+  const handleNextHand = () => {
+    actions.resetGame();
+  };
+
+  const handleNewMatch = () => {
+    actions.resetGame();
+    setHandHistory([]);
   };
 
   if (view === 'table') {
+    const playerData = state.players.find(p => !p.isAI);
+    const aiData = state.players.find(p => p.isAI);
+    const isGameOver = (playerData?.chips || 0) === 0 || (aiData?.chips || 0) === 0;
+
     return (
       <section id="poker" className="py-24 relative bg-gradient-to-b from-background via-secondary/5 to-background">
         <div className="container mx-auto px-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <Button
               variant="ghost"
               onClick={handleBackToLobby}
@@ -48,31 +83,98 @@ export default function PokerGame() {
                 TEXAS HOLD'EM <span className="text-glow-magenta text-secondary">AI DUEL</span>
               </h2>
             </div>
-            <div className="w-24" /> {/* Spacer for centering */}
+            <Button
+              variant="ghost"
+              onClick={handleNewMatch}
+              className="text-muted-foreground hover:text-primary"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              New Match
+            </Button>
           </div>
 
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Poker Table */}
-            <PokerTable state={state} />
+          {/* Match Stats */}
+          <div className="max-w-4xl mx-auto mb-6">
+            <MatchStats
+              playerChips={playerData?.chips || 0}
+              aiChips={aiData?.chips || 0}
+              initialChips={initialBuyIn}
+              handsPlayed={handHistory.length}
+            />
+          </div>
 
-            {/* Betting Controls */}
-            <div className="cyber-card p-6">
-              <BettingControls state={state} actions={actions} />
-            </div>
+          <div className="max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Main game area */}
+              <div className="md:col-span-2 space-y-6">
+                {/* Poker Table */}
+                <PokerTable state={state} />
 
-            {/* Game Info */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="cyber-card p-3 text-center">
-                <span className="text-xs text-muted-foreground">Blinds</span>
-                <p className="font-mono text-primary">5/10</p>
+                {/* Betting Controls or Winner Display */}
+                <div className="cyber-card p-6">
+                  {state.phase === 'finished' && state.winner ? (
+                    <WinnerDisplay
+                      winner={state.winner}
+                      pot={state.pot}
+                      winningHand={state.winningHand}
+                      onContinue={handleNextHand}
+                    />
+                  ) : (
+                    <BettingControls state={state} actions={actions} />
+                  )}
+                </div>
+
+                {/* Game Over state */}
+                {isGameOver && state.phase === 'waiting' && (
+                  <div className="cyber-card p-6 text-center border-accent">
+                    <h3 className="font-display text-2xl mb-4">
+                      {(playerData?.chips || 0) === 0 ? (
+                        <span className="text-destructive">GAME OVER - AI WINS THE MATCH!</span>
+                      ) : (
+                        <span className="text-success">CONGRATULATIONS - YOU WIN THE MATCH!</span>
+                      )}
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Hands played: {handHistory.length}
+                    </p>
+                    <div className="flex gap-4 justify-center">
+                      <Button onClick={handleNewMatch} className="cyber-btn-primary">
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        NEW MATCH
+                      </Button>
+                      <Button onClick={handleBackToLobby} variant="outline">
+                        BACK TO LOBBY
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="cyber-card p-3 text-center">
-                <span className="text-xs text-muted-foreground">Your Chips</span>
-                <p className="font-mono text-primary">{state.players[0]?.chips || 0}</p>
-              </div>
-              <div className="cyber-card p-3 text-center">
-                <span className="text-xs text-muted-foreground">AI Chips</span>
-                <p className="font-mono text-secondary">{state.players[1]?.chips || 0}</p>
+
+              {/* Sidebar - Hand History */}
+              <div className="space-y-4">
+                <HandHistory history={handHistory} />
+
+                {/* Quick Info */}
+                <div className="cyber-card p-4">
+                  <h4 className="font-display text-sm mb-2 text-muted-foreground">BLINDS</h4>
+                  <span className="font-mono text-lg text-primary">
+                    {state.smallBlind}/{state.bigBlind}
+                  </span>
+                </div>
+
+                {/* Last Action */}
+                {state.lastAction && (
+                  <div className="cyber-card p-4">
+                    <h4 className="font-display text-sm mb-2 text-muted-foreground">LAST ACTION</h4>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">{state.lastAction.player}</span>
+                      <span className="font-mono text-primary uppercase">
+                        {state.lastAction.action}
+                        {state.lastAction.amount && ` ${state.lastAction.amount}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
