@@ -9,13 +9,13 @@ interface PokerTableProps {
 }
 
 const phaseNames: Record<string, string> = {
-  'waiting': '等待开始',
-  'pre-flop': '翻牌前',
-  'flop': '翻牌',
-  'turn': '转牌',
-  'river': '河牌',
-  'showdown': '摊牌',
-  'finished': '结束',
+  'waiting': 'WAITING',
+  'pre-flop': 'PRE-FLOP',
+  'flop': 'FLOP',
+  'turn': 'TURN',
+  'river': 'RIVER',
+  'showdown': 'SHOWDOWN',
+  'finished': 'FINISHED',
 };
 
 export function PokerTable({ state }: PokerTableProps) {
@@ -37,7 +37,7 @@ export function PokerTable({ state }: PokerTableProps) {
         <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {state.lastAction.player}: 
-            <span className="text-primary ml-1">
+            <span className="text-primary ml-1 uppercase">
               {state.lastAction.action}
               {state.lastAction.amount && ` ${state.lastAction.amount}`}
             </span>
@@ -66,9 +66,9 @@ export function PokerTable({ state }: PokerTableProps) {
             )}>
               <Cpu className="h-8 w-8 md:h-10 md:w-10 text-secondary" />
             </div>
-            <span className="font-display text-sm text-secondary">AI 对手</span>
+            <span className="font-display text-sm text-secondary">AI OPPONENT</span>
             <div className="font-mono text-xs text-muted-foreground mt-1">
-              筹码: {aiData?.chips || 0}
+              Chips: {aiData?.chips || 0}
             </div>
             {aiData && aiData.currentBet > 0 && (
               <div className="mt-2">
@@ -93,10 +93,10 @@ export function PokerTable({ state }: PokerTableProps) {
               )}
             </div>
             {aiData?.hasFolded && (
-              <span className="text-destructive text-sm mt-2 block">已弃牌</span>
+              <span className="text-destructive text-sm mt-2 block">FOLDED</span>
             )}
             {aiData?.isAllIn && (
-              <span className="text-accent text-sm mt-2 block">全押!</span>
+              <span className="text-accent text-sm mt-2 block">ALL-IN!</span>
             )}
           </div>
         </div>
@@ -115,7 +115,7 @@ export function PokerTable({ state }: PokerTableProps) {
 
         {/* Pot Display */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <ChipStack amount={state.pot} label="底池" variant="gold" />
+          <ChipStack amount={state.pot} label="POT" variant="gold" />
         </div>
 
         {/* Player */}
@@ -151,15 +151,15 @@ export function PokerTable({ state }: PokerTableProps) {
             )}>
               <User className="h-8 w-8 md:h-10 md:w-10 text-primary" />
             </div>
-            <span className="font-display text-sm text-primary">你</span>
+            <span className="font-display text-sm text-primary">YOU</span>
             <div className="font-mono text-xs text-muted-foreground mt-1">
-              筹码: {playerData?.chips || 0}
+              Chips: {playerData?.chips || 0}
             </div>
             {playerData?.hasFolded && (
-              <span className="text-destructive text-sm mt-2 block">已弃牌</span>
+              <span className="text-destructive text-sm mt-2 block">FOLDED</span>
             )}
             {playerData?.isAllIn && (
-              <span className="text-accent text-sm mt-2 block">全押!</span>
+              <span className="text-accent text-sm mt-2 block">ALL-IN!</span>
             )}
           </div>
         </div>
