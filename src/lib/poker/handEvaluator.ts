@@ -66,6 +66,16 @@ function isStraightFlush(cards: Card[]): { values: number[]; isRoyal: boolean } 
   return null;
 }
 
+const rankNames: Record<number, string> = {
+  2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10',
+  11: 'Jack', 12: 'Queen', 13: 'King', 14: 'Ace'
+};
+
+const rankNamesPlural: Record<number, string> = {
+  2: 'Twos', 3: 'Threes', 4: 'Fours', 5: 'Fives', 6: 'Sixes', 7: 'Sevens',
+  8: 'Eights', 9: 'Nines', 10: 'Tens', 11: 'Jacks', 12: 'Queens', 13: 'Kings', 14: 'Aces'
+};
+
 export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandResult {
   const allCards = [...holeCards, ...communityCards];
   const byRank = getCardsByRank(allCards);
@@ -88,14 +98,14 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
         rank: 'royal-flush',
         rankValue: 10,
         highCards: straightFlush.values,
-        description: 'Royal Flush'
+        description: 'Royal Flush!'
       };
     }
     return {
       rank: 'straight-flush',
       rankValue: 9,
       highCards: straightFlush.values,
-      description: `Straight Flush, ${straightFlush.values[0]} high`
+      description: `Straight Flush, ${rankNames[straightFlush.values[0]]} high`
     };
   }
 
@@ -106,7 +116,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'four-of-a-kind',
       rankValue: 8,
       highCards: [counts[0].value, kicker],
-      description: `Four of a Kind, ${counts[0].value}s`
+      description: `Four of a Kind, ${rankNamesPlural[counts[0].value]}`
     };
   }
 
@@ -116,7 +126,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'full-house',
       rankValue: 7,
       highCards: [counts[0].value, counts[1].value],
-      description: `Full House, ${counts[0].value}s full of ${counts[1].value}s`
+      description: `Full House, ${rankNamesPlural[counts[0].value]} over ${rankNamesPlural[counts[1].value]}`
     };
   }
 
@@ -127,7 +137,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'flush',
       rankValue: 6,
       highCards: flush.map(c => getRankValue(c.rank)),
-      description: `Flush, ${getRankValue(flush[0].rank)} high`
+      description: `Flush, ${rankNames[getRankValue(flush[0].rank)]} high`
     };
   }
 
@@ -138,7 +148,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'straight',
       rankValue: 5,
       highCards: straight,
-      description: `Straight, ${straight[0]} high`
+      description: `Straight, ${rankNames[straight[0]] || straight[0]} high`
     };
   }
 
@@ -149,7 +159,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'three-of-a-kind',
       rankValue: 4,
       highCards: [counts[0].value, ...kickers],
-      description: `Three of a Kind, ${counts[0].value}s`
+      description: `Three of a Kind, ${rankNamesPlural[counts[0].value]}`
     };
   }
 
@@ -160,7 +170,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'two-pair',
       rankValue: 3,
       highCards: [counts[0].value, counts[1].value, kicker],
-      description: `Two Pair, ${counts[0].value}s and ${counts[1].value}s`
+      description: `Two Pair, ${rankNamesPlural[counts[0].value]} and ${rankNamesPlural[counts[1].value]}`
     };
   }
 
@@ -171,7 +181,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
       rank: 'pair',
       rankValue: 2,
       highCards: [counts[0].value, ...kickers],
-      description: `Pair of ${counts[0].value}s`
+      description: `Pair of ${rankNamesPlural[counts[0].value]}`
     };
   }
 
@@ -181,7 +191,7 @@ export function evaluateHand(holeCards: Card[], communityCards: Card[]): HandRes
     rank: 'high-card',
     rankValue: 1,
     highCards,
-    description: `High Card ${highCards[0]}`
+    description: `${rankNames[highCards[0]]} High`
   };
 }
 
@@ -202,16 +212,16 @@ export function compareHands(hand1: HandResult, hand2: HandResult): number {
 
 export function getHandRankName(rank: HandRank): string {
   const names: Record<HandRank, string> = {
-    'high-card': '高牌',
-    'pair': '一对',
-    'two-pair': '两对',
-    'three-of-a-kind': '三条',
-    'straight': '顺子',
-    'flush': '同花',
-    'full-house': '葫芦',
-    'four-of-a-kind': '四条',
-    'straight-flush': '同花顺',
-    'royal-flush': '皇家同花顺'
+    'high-card': 'High Card',
+    'pair': 'Pair',
+    'two-pair': 'Two Pair',
+    'three-of-a-kind': 'Three of a Kind',
+    'straight': 'Straight',
+    'flush': 'Flush',
+    'full-house': 'Full House',
+    'four-of-a-kind': 'Four of a Kind',
+    'straight-flush': 'Straight Flush',
+    'royal-flush': 'Royal Flush'
   };
   return names[rank];
 }

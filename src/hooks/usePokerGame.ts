@@ -1,10 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
-import { GameState, GameActions, Player, Card, PlayerAction } from '@/lib/poker/types';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { GameState, GameActions, Player, Card, PlayerAction, GamePhase } from '@/lib/poker/types';
 import { createDeck, shuffleDeck, dealCards } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/handEvaluator';
 import { getAIDecision } from '@/lib/poker/aiPlayer';
 
-const INITIAL_CHIPS = 1000;
 const SMALL_BLIND = 5;
 const BIG_BLIND = 10;
 
@@ -54,106 +53,114 @@ function createInitialState(buyIn: number): GameState {
   };
 }
 
-export function usePokerGame(buyIn: number = INITIAL_CHIPS): { state: GameState; actions: GameActions } {
+export function usePokerGame(buyIn: number = 1000): { state: GameState; actions: GameActions } {
   const [state, setState] = useState<GameState>(() => createInitialState(buyIn));
+  const aiThinkingRef = useRef(false);
+  const initialBuyInRef = useRef(buyIn);
 
-  const updatePlayer = useCallback((playerId: string, updates: Partial<Player>) => {
-    setState(prev => ({
-      ...prev,
-      players: prev.players.map(p => 
-        p.id === playerId ? { ...p, ...updates } : p
-      ),
+  // Track buyIn changes for new matches
+  useEffect(() => {
+    initialBuyInRef.current = buyIn;
+  }, [buyIn]);
+
+  const getActivePlayer = useCallback((players: Player[], index: number) => {
+    return players[index];
+  }, []);
+
+  const getNextActivePlayerIndex = useCallback((players: Player[], currentIndex: number): number => {
+    const nextIndex = (currentIndex + 1) % players.length;
+    const nextPlayer = players[nextIndex];
+    
+    // If next player has folded or is all-in, they can't act
+    if (nextPlayer.hasFolded || nextPlayer.isAllIn) {
+      return currentIndex; // Stay on current (or skip)
+    }
+    return nextIndex;
+  }, []);
+
+  const advanceToNextPhase = useCallback((prevState: GameState): GameState => {
+    const phases: GamePhase[] = ['pre-flop', 'flop', 'turn', 'river', 'showdown'];
+    const currentPhaseIndex = phases.indexOf(prevState.phase as GamePhase);
+    
+    if (currentPhaseIndex === -1 || currentPhaseIndex >= phases.length - 1) {
+      return prevState;
+    }
+
+    const nextPhase = phases[currentPhaseIndex + 1];
+    let newCommunityCards = [...prevState.communityCards];
+    let newDeck = [...prevState.deck];
+
+    // Deal community cards based on phase
+    if (nextPhase === 'flop') {
+      const { cards, remainingDeck } = dealCards(newDeck, 3);
+      newCommunityCards = cards;
+      newDeck = remainingDeck;
+    } else if (nextPhase === 'turn' || nextPhase === 'river') {
+      const { cards, remainingDeck } = dealCards(newDeck, 1);
+      newCommunityCards = [...newCommunityCards, ...cards];
+      newDeck = remainingDeck;
+    }
+
+    // Reset betting for new round - non-dealer acts first post-flop
+    const resetPlayers = prevState.players.map(p => ({
+      ...p,
+      currentBet: 0,
+      hasActed: p.hasFolded || p.isAllIn, // Folded/all-in players don't need to act
     }));
+
+    // In heads-up, BB (non-dealer) acts first post-flop
+    const firstToAct = resetPlayers.findIndex(p => !p.isDealer && !p.hasFolded && !p.isAllIn);
+    const actualFirst = firstToAct >= 0 ? firstToAct : resetPlayers.findIndex(p => !p.hasFolded && !p.isAllIn);
+
+    return {
+      ...prevState,
+      phase: nextPhase,
+      communityCards: newCommunityCards,
+      deck: newDeck,
+      currentBet: 0,
+      currentPlayerIndex: actualFirst >= 0 ? actualFirst : 0,
+      players: resetPlayers,
+    };
   }, []);
 
-  const getCurrentPlayer = useCallback(() => {
-    return state.players[state.currentPlayerIndex];
-  }, [state.players, state.currentPlayerIndex]);
-
-  const getOtherPlayer = useCallback(() => {
-    return state.players[(state.currentPlayerIndex + 1) % 2];
-  }, [state.players, state.currentPlayerIndex]);
-
-  const advancePhase = useCallback(() => {
-    setState(prev => {
-      const phases: GameState['phase'][] = ['pre-flop', 'flop', 'turn', 'river', 'showdown'];
-      const currentIndex = phases.indexOf(prev.phase as any);
-      
-      if (currentIndex === -1 || currentIndex >= phases.length - 1) {
-        return prev;
-      }
-
-      const nextPhase = phases[currentIndex + 1];
-      let newCommunityCards = [...prev.communityCards];
-      let newDeck = [...prev.deck];
-
-      if (nextPhase === 'flop') {
-        const { cards, remainingDeck } = dealCards(newDeck, 3);
-        newCommunityCards = cards;
-        newDeck = remainingDeck;
-      } else if (nextPhase === 'turn' || nextPhase === 'river') {
-        const { cards, remainingDeck } = dealCards(newDeck, 1);
-        newCommunityCards = [...newCommunityCards, ...cards];
-        newDeck = remainingDeck;
-      }
-
-      // Reset betting for new round
-      const resetPlayers = prev.players.map(p => ({
-        ...p,
-        currentBet: 0,
-        hasActed: false,
-      }));
-
-      // Determine first to act (non-dealer in heads up)
-      const firstToAct = resetPlayers.findIndex(p => !p.isDealer);
-
+  const determineWinner = useCallback((prevState: GameState): GameState => {
+    const activePlayers = prevState.players.filter(p => !p.hasFolded);
+    
+    if (activePlayers.length === 1) {
+      // Other player folded
+      const winner = activePlayers[0];
       return {
-        ...prev,
-        phase: nextPhase,
-        communityCards: newCommunityCards,
-        deck: newDeck,
-        currentBet: 0,
-        currentPlayerIndex: firstToAct,
-        players: resetPlayers,
-      };
-    });
-  }, []);
-
-  const determineWinner = useCallback(() => {
-    setState(prev => {
-      const activePlayers = prev.players.filter(p => !p.hasFolded);
-      
-      if (activePlayers.length === 1) {
-        // Other player folded
-        return {
-          ...prev,
-          phase: 'finished',
-          winner: activePlayers[0],
-          winningHand: null,
-        };
-      }
-
-      // Evaluate hands
-      const hands = activePlayers.map(p => ({
-        player: p,
-        hand: evaluateHand(p.cards, prev.communityCards),
-      }));
-
-      hands.sort((a, b) => compareHands(b.hand, a.hand));
-      const winningHand = hands[0];
-
-      return {
-        ...prev,
+        ...prevState,
         phase: 'finished',
-        winner: winningHand.player,
-        winningHand: winningHand.hand,
+        winner,
+        winningHand: null,
       };
-    });
+    }
+
+    // Showdown - evaluate hands
+    const hands = activePlayers.map(p => ({
+      player: p,
+      hand: evaluateHand(p.cards, prevState.communityCards),
+    }));
+
+    hands.sort((a, b) => compareHands(b.hand, a.hand));
+    const winningHand = hands[0];
+
+    return {
+      ...prevState,
+      phase: 'finished',
+      winner: winningHand.player,
+      winningHand: winningHand.hand,
+    };
   }, []);
 
   const processAction = useCallback((action: PlayerAction, amount?: number) => {
     setState(prev => {
+      if (prev.phase === 'waiting' || prev.phase === 'finished') return prev;
+      
       const currentPlayer = prev.players[prev.currentPlayerIndex];
+      if (!currentPlayer || currentPlayer.hasFolded || currentPlayer.isAllIn) return prev;
+
       const updatedPlayers = [...prev.players];
       const playerIndex = prev.currentPlayerIndex;
       let newPot = prev.pot;
@@ -169,6 +176,7 @@ export function usePokerGame(buyIn: number = INITIAL_CHIPS): { state: GameState;
           break;
 
         case 'check':
+          if (prev.currentBet > currentPlayer.currentBet) return prev; // Can't check if there's a bet
           updatedPlayers[playerIndex] = {
             ...currentPlayer,
             hasActed: true,
@@ -176,36 +184,37 @@ export function usePokerGame(buyIn: number = INITIAL_CHIPS): { state: GameState;
           break;
 
         case 'call':
-          const callAmount = prev.currentBet - currentPlayer.currentBet;
-          const actualCall = Math.min(callAmount, currentPlayer.chips);
+          const callAmount = Math.min(prev.currentBet - currentPlayer.currentBet, currentPlayer.chips);
           updatedPlayers[playerIndex] = {
             ...currentPlayer,
-            chips: currentPlayer.chips - actualCall,
-            currentBet: currentPlayer.currentBet + actualCall,
-            totalBet: currentPlayer.totalBet + actualCall,
+            chips: currentPlayer.chips - callAmount,
+            currentBet: currentPlayer.currentBet + callAmount,
+            totalBet: currentPlayer.totalBet + callAmount,
             hasActed: true,
-            isAllIn: actualCall >= currentPlayer.chips,
+            isAllIn: callAmount >= currentPlayer.chips,
           };
-          newPot += actualCall;
+          newPot += callAmount;
           break;
 
         case 'raise':
-          const raiseAmount = amount || prev.bigBlind * 2;
-          const totalBet = prev.currentBet + raiseAmount;
-          const toAdd = totalBet - currentPlayer.currentBet;
-          const actualAdd = Math.min(toAdd, currentPlayer.chips);
+          const raiseTotal = amount || prev.bigBlind * 2;
+          const toAdd = Math.min(raiseTotal, currentPlayer.chips);
           updatedPlayers[playerIndex] = {
             ...currentPlayer,
-            chips: currentPlayer.chips - actualAdd,
-            currentBet: currentPlayer.currentBet + actualAdd,
-            totalBet: currentPlayer.totalBet + actualAdd,
+            chips: currentPlayer.chips - toAdd,
+            currentBet: currentPlayer.currentBet + toAdd,
+            totalBet: currentPlayer.totalBet + toAdd,
             hasActed: true,
-            isAllIn: actualAdd >= currentPlayer.chips,
+            isAllIn: toAdd >= currentPlayer.chips,
           };
-          newPot += actualAdd;
+          newPot += toAdd;
           newCurrentBet = updatedPlayers[playerIndex].currentBet;
-          // Reset other player's hasActed so they must respond
-          updatedPlayers[(playerIndex + 1) % 2].hasActed = false;
+          
+          // Other player must respond to raise
+          const otherIdx = (playerIndex + 1) % 2;
+          if (!updatedPlayers[otherIdx].hasFolded && !updatedPlayers[otherIdx].isAllIn) {
+            updatedPlayers[otherIdx].hasActed = false;
+          }
           break;
 
         case 'all-in':
@@ -219,85 +228,114 @@ export function usePokerGame(buyIn: number = INITIAL_CHIPS): { state: GameState;
             isAllIn: true,
           };
           newPot += allInAmount;
+          
           if (updatedPlayers[playerIndex].currentBet > newCurrentBet) {
             newCurrentBet = updatedPlayers[playerIndex].currentBet;
-            updatedPlayers[(playerIndex + 1) % 2].hasActed = false;
+            const otherIndex = (playerIndex + 1) % 2;
+            if (!updatedPlayers[otherIndex].hasFolded && !updatedPlayers[otherIndex].isAllIn) {
+              updatedPlayers[otherIndex].hasActed = false;
+            }
           }
           break;
       }
+
+      // Check if someone folded
+      const someoneFolded = updatedPlayers.some(p => p.hasFolded);
+      if (someoneFolded) {
+        return determineWinner({
+          ...prev,
+          players: updatedPlayers,
+          pot: newPot,
+          currentBet: newCurrentBet,
+          lastAction: { player: currentPlayer.name, action, amount },
+        });
+      }
+
+      // Check if round is complete
+      const activePlayers = updatedPlayers.filter(p => !p.hasFolded && !p.isAllIn);
+      const allActed = activePlayers.every(p => p.hasActed);
+      const betsEqual = activePlayers.every(p => p.currentBet === newCurrentBet);
+      const allAllIn = updatedPlayers.filter(p => !p.hasFolded).every(p => p.isAllIn);
+
+      // If all players are all-in, run out remaining cards
+      if (allAllIn) {
+        let newState: GameState = {
+          ...prev,
+          players: updatedPlayers,
+          pot: newPot,
+          currentBet: newCurrentBet,
+          lastAction: { player: currentPlayer.name, action, amount },
+        };
+        
+        // Fast-forward through remaining phases
+        while (newState.phase !== 'river' && newState.phase !== 'showdown' && newState.phase !== 'finished') {
+          newState = advanceToNextPhase(newState);
+        }
+        
+        if (newState.phase === 'river') {
+          return determineWinner(newState);
+        }
+        return newState;
+      }
+
+      // If all active players have acted and bets are equal, advance phase
+      if (allActed && betsEqual) {
+        const newState: GameState = {
+          ...prev,
+          players: updatedPlayers,
+          pot: newPot,
+          currentBet: newCurrentBet,
+          lastAction: { player: currentPlayer.name, action, amount },
+        };
+        
+        if (prev.phase === 'river') {
+          return determineWinner(newState);
+        }
+        return advanceToNextPhase(newState);
+      }
+
+      // Otherwise, move to next player
+      const nextPlayerIndex = (playerIndex + 1) % 2;
 
       return {
         ...prev,
         players: updatedPlayers,
         pot: newPot,
         currentBet: newCurrentBet,
-        currentPlayerIndex: (playerIndex + 1) % 2,
-        lastAction: {
-          player: currentPlayer.name,
-          action,
-          amount,
-        },
+        currentPlayerIndex: nextPlayerIndex,
+        lastAction: { player: currentPlayer.name, action, amount },
       };
     });
-  }, []);
+  }, [advanceToNextPhase, determineWinner]);
 
-  // Check if round is complete
+  // AI turn effect
   useEffect(() => {
-    if (state.phase === 'waiting' || state.phase === 'finished') return;
-
-    const activePlayers = state.players.filter(p => !p.hasFolded && !p.isAllIn);
-    const allActed = activePlayers.every(p => p.hasActed);
-    const betsEqual = activePlayers.every(p => p.currentBet === state.currentBet);
-    const someoneFolded = state.players.some(p => p.hasFolded);
-
-    if (someoneFolded) {
-      determineWinner();
+    if (state.phase === 'waiting' || state.phase === 'finished' || state.phase === 'showdown') {
       return;
     }
 
-    // Check if both players are all-in
-    const allAllIn = state.players.filter(p => !p.hasFolded).every(p => p.isAllIn);
-    if (allAllIn) {
-      // Run out all community cards
-      if (state.phase === 'river') {
-        determineWinner();
-      } else {
-        setTimeout(advancePhase, 1000);
-      }
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer?.isAI || currentPlayer.hasFolded || currentPlayer.isAllIn) {
       return;
     }
 
-    if (allActed && betsEqual) {
-      if (state.phase === 'river') {
-        determineWinner();
-      } else {
-        advancePhase();
-      }
-    }
-  }, [state.players, state.phase, state.currentBet, advancePhase, determineWinner]);
-
-  // AI turn
-  useEffect(() => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer?.isAI || state.phase === 'waiting' || state.phase === 'finished' || state.aiThinking) {
-      return;
-    }
-
-    if (currentPlayer.hasFolded || currentPlayer.isAllIn) {
-      setState(prev => ({
-        ...prev,
-        currentPlayerIndex: (prev.currentPlayerIndex + 1) % 2,
-      }));
-      return;
-    }
-
+    if (aiThinkingRef.current) return;
+    
+    aiThinkingRef.current = true;
     setState(prev => ({ ...prev, aiThinking: true }));
 
     getAIDecision(state).then(decision => {
       processAction(decision.action, decision.raiseAmount);
       setState(prev => ({ ...prev, aiThinking: false }));
+      aiThinkingRef.current = false;
+    }).catch(() => {
+      // Fallback: AI checks or folds
+      const canCheck = state.currentBet <= currentPlayer.currentBet;
+      processAction(canCheck ? 'check' : 'fold');
+      setState(prev => ({ ...prev, aiThinking: false }));
+      aiThinkingRef.current = false;
     });
-  }, [state.currentPlayerIndex, state.phase, getCurrentPlayer, processAction, state.aiThinking]);
+  }, [state.currentPlayerIndex, state.phase, processAction, state.currentBet]);
 
   const startGame = useCallback(() => {
     const deck = shuffleDeck(createDeck());
@@ -306,41 +344,32 @@ export function usePokerGame(buyIn: number = INITIAL_CHIPS): { state: GameState;
     const { cards: playerCards, remainingDeck: deck1 } = dealCards(deck, 2);
     const { cards: aiCards, remainingDeck: deck2 } = dealCards(deck1, 2);
 
-    // Post blinds (in heads up, dealer posts small blind)
-    const dealerIndex = 0; // Player is dealer
-    const sbIndex = dealerIndex;
-    const bbIndex = (dealerIndex + 1) % 2;
-
     setState(prev => {
-      const newPlayers = [...prev.players];
-      
-      // Post small blind
-      const sbAmount = Math.min(SMALL_BLIND, newPlayers[sbIndex].chips);
-      newPlayers[sbIndex] = {
-        ...newPlayers[sbIndex],
-        chips: newPlayers[sbIndex].chips - sbAmount,
-        currentBet: sbAmount,
-        totalBet: sbAmount,
-        cards: playerCards,
-        isDealer: true,
-        hasFolded: false,
-        hasActed: false,
-        isAllIn: false,
-      };
+      // In heads-up, dealer posts SB and acts first pre-flop
+      const dealerIndex = prev.dealerIndex;
+      const sbIndex = dealerIndex;
+      const bbIndex = (dealerIndex + 1) % 2;
 
-      // Post big blind
-      const bbAmount = Math.min(BIG_BLIND, newPlayers[bbIndex].chips);
-      newPlayers[bbIndex] = {
-        ...newPlayers[bbIndex],
-        chips: newPlayers[bbIndex].chips - bbAmount,
-        currentBet: bbAmount,
-        totalBet: bbAmount,
-        cards: aiCards,
-        isDealer: false,
-        hasFolded: false,
-        hasActed: false,
-        isAllIn: false,
-      };
+      const newPlayers = prev.players.map((p, i) => {
+        const isDealer = i === sbIndex;
+        const blindAmount = isDealer ? SMALL_BLIND : BIG_BLIND;
+        const chips = p.chips - Math.min(blindAmount, p.chips);
+        
+        return {
+          ...p,
+          chips,
+          currentBet: Math.min(blindAmount, p.chips + blindAmount),
+          totalBet: Math.min(blindAmount, p.chips + blindAmount),
+          cards: i === 0 ? playerCards : aiCards,
+          isDealer,
+          hasFolded: false,
+          hasActed: false,
+          isAllIn: chips === 0,
+        };
+      });
+
+      const sbAmount = Math.min(SMALL_BLIND, prev.players[sbIndex].chips);
+      const bbAmount = Math.min(BIG_BLIND, prev.players[bbIndex].chips);
 
       return {
         ...prev,
@@ -350,55 +379,66 @@ export function usePokerGame(buyIn: number = INITIAL_CHIPS): { state: GameState;
         communityCards: [],
         pot: sbAmount + bbAmount,
         currentBet: BIG_BLIND,
-        currentPlayerIndex: sbIndex, // Dealer acts first in heads up pre-flop
+        currentPlayerIndex: sbIndex, // Dealer (SB) acts first in heads-up pre-flop
         dealerIndex,
         winner: null,
         winningHand: null,
         lastAction: null,
+        aiThinking: false,
       };
     });
   }, []);
 
   const fold = useCallback(() => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer || currentPlayer.isAI) return;
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer || currentPlayer.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
     processAction('fold');
-  }, [getCurrentPlayer, processAction]);
+  }, [state.players, state.currentPlayerIndex, state.phase, processAction]);
 
   const check = useCallback(() => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer || currentPlayer.isAI) return;
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer || currentPlayer.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
     if (state.currentBet > currentPlayer.currentBet) return;
     processAction('check');
-  }, [getCurrentPlayer, state.currentBet, processAction]);
+  }, [state.players, state.currentPlayerIndex, state.phase, state.currentBet, processAction]);
 
   const call = useCallback(() => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer || currentPlayer.isAI) return;
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer || currentPlayer.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
     processAction('call');
-  }, [getCurrentPlayer, processAction]);
+  }, [state.players, state.currentPlayerIndex, state.phase, processAction]);
 
   const raise = useCallback((amount: number) => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer || currentPlayer.isAI) return;
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer || currentPlayer.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
     processAction('raise', amount);
-  }, [getCurrentPlayer, processAction]);
+  }, [state.players, state.currentPlayerIndex, state.phase, processAction]);
 
   const allIn = useCallback(() => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer || currentPlayer.isAI) return;
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer || currentPlayer.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
     processAction('all-in');
-  }, [getCurrentPlayer, processAction]);
+  }, [state.players, state.currentPlayerIndex, state.phase, processAction]);
 
   const resetGame = useCallback(() => {
     setState(prev => {
-      // Keep chips, swap dealer
+      // Swap dealer position for next hand
       const newDealerIndex = (prev.dealerIndex + 1) % 2;
+      
+      // Calculate new chip counts
+      const playerChips = prev.players.map((p, i) => {
+        let chips = p.chips;
+        if (prev.winner?.id === p.id) {
+          chips += prev.pot;
+        }
+        return chips;
+      });
+
       return {
-        ...createInitialState(INITIAL_CHIPS),
+        ...createInitialState(initialBuyInRef.current),
         players: prev.players.map((p, i) => ({
-          ...createInitialState(INITIAL_CHIPS).players[i],
-          chips: p.chips + (prev.winner?.id === p.id ? prev.pot : 0),
+          ...createInitialState(initialBuyInRef.current).players[i],
+          chips: playerChips[i],
           isDealer: i === newDealerIndex,
         })),
         dealerIndex: newDealerIndex,
