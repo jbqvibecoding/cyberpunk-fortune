@@ -60,6 +60,10 @@ export interface GameState {
   winningHand: HandResult | null;
   lastAction: { player: string; action: PlayerAction; amount?: number } | null;
   aiThinking: boolean;
+  aiCommentary: string | null;
+  showdownRevealed: boolean;
+  isTie?: boolean;
+  tiedPlayers?: Player[];
 }
 
 export interface GameActions {

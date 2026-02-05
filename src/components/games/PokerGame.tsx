@@ -115,13 +115,21 @@ export default function PokerGame() {
 
                 {/* Betting Controls or Winner Display */}
                 <div className="cyber-card p-6">
-                  {state.phase === 'finished' && state.winner ? (
+                  {state.phase === 'finished' ? (
                     <WinnerDisplay
                       winner={state.winner}
                       pot={state.pot}
                       winningHand={state.winningHand}
                       onContinue={handleNextHand}
+                      isTie={state.isTie}
+                      tiedPlayers={state.tiedPlayers}
                     />
+                  ) : state.phase === 'showdown' ? (
+                    <div className="text-center py-8">
+                      <span className="font-display text-xl text-accent animate-pulse">
+                        REVEALING CARDS...
+                      </span>
+                    </div>
                   ) : (
                     <BettingControls state={state} actions={actions} />
                   )}
