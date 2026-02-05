@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameState, GameActions, Player, Card, PlayerAction, GamePhase } from '@/lib/poker/types';
 import { createDeck, shuffleDeck, dealCards } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/handEvaluator';
-import { getAIDecision } from '@/lib/poker/aiPlayer';
+import { getAIDecision, getAICommentary } from '@/lib/poker/aiPlayer';
 
 const SMALL_BLIND = 5;
 const BIG_BLIND = 10;
@@ -50,6 +50,8 @@ function createInitialState(buyIn: number): GameState {
     winningHand: null,
     lastAction: null,
     aiThinking: false,
+    aiCommentary: null,
+    showdownRevealed: false,
   };
 }
 
@@ -62,10 +64,6 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
   useEffect(() => {
     initialBuyInRef.current = buyIn;
   }, [buyIn]);
-
-  const getActivePlayer = useCallback((players: Player[], index: number) => {
-    return players[index];
-  }, []);
 
   const getNextActivePlayerIndex = useCallback((players: Player[], currentIndex: number): number => {
     const nextIndex = (currentIndex + 1) % players.length;
@@ -120,6 +118,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
       currentBet: 0,
       currentPlayerIndex: actualFirst >= 0 ? actualFirst : 0,
       players: resetPlayers,
+      aiCommentary: null,
     };
   }, []);
 
@@ -127,13 +126,23 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     const activePlayers = prevState.players.filter(p => !p.hasFolded);
     
     if (activePlayers.length === 1) {
-      // Other player folded
+      // Other player folded - no showdown needed
       const winner = activePlayers[0];
       return {
         ...prevState,
         phase: 'finished',
         winner,
         winningHand: null,
+        showdownRevealed: false,
+      };
+    }
+
+    // Go to showdown first to reveal cards, then determine winner
+    if (prevState.phase !== 'showdown') {
+      return {
+        ...prevState,
+        phase: 'showdown',
+        showdownRevealed: true,
       };
     }
 
@@ -146,15 +155,29 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     hands.sort((a, b) => compareHands(b.hand, a.hand));
     const winningHand = hands[0];
 
+    // Check for tie
+    if (hands.length > 1 && compareHands(hands[0].hand, hands[1].hand) === 0) {
+      // It's a tie - split the pot
+      return {
+        ...prevState,
+        phase: 'finished',
+        winner: null, // null indicates a tie
+        winningHand: hands[0].hand,
+        isTie: true,
+        tiedPlayers: [hands[0].player, hands[1].player],
+      };
+    }
+
     return {
       ...prevState,
       phase: 'finished',
       winner: winningHand.player,
       winningHand: winningHand.hand,
+      showdownRevealed: true,
     };
   }, []);
 
-  const processAction = useCallback((action: PlayerAction, amount?: number) => {
+  const processAction = useCallback((action: PlayerAction, amount?: number, commentary?: string) => {
     setState(prev => {
       if (prev.phase === 'waiting' || prev.phase === 'finished') return prev;
       
@@ -239,55 +262,44 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
           break;
       }
 
+      const newState: GameState = {
+        ...prev,
+        players: updatedPlayers,
+        pot: newPot,
+        currentBet: newCurrentBet,
+        lastAction: { player: currentPlayer.name, action, amount },
+        aiCommentary: currentPlayer.isAI ? (commentary || getAICommentary(action)) : prev.aiCommentary,
+      };
+
       // Check if someone folded
       const someoneFolded = updatedPlayers.some(p => p.hasFolded);
       if (someoneFolded) {
-        return determineWinner({
-          ...prev,
-          players: updatedPlayers,
-          pot: newPot,
-          currentBet: newCurrentBet,
-          lastAction: { player: currentPlayer.name, action, amount },
-        });
+        return determineWinner(newState);
       }
 
       // Check if round is complete
       const activePlayers = updatedPlayers.filter(p => !p.hasFolded && !p.isAllIn);
       const allActed = activePlayers.every(p => p.hasActed);
-      const betsEqual = activePlayers.every(p => p.currentBet === newCurrentBet);
+      const betsEqual = activePlayers.every(p => p.currentBet === newCurrentBet) || activePlayers.length === 0;
       const allAllIn = updatedPlayers.filter(p => !p.hasFolded).every(p => p.isAllIn);
 
       // If all players are all-in, run out remaining cards
-      if (allAllIn) {
-        let newState: GameState = {
-          ...prev,
-          players: updatedPlayers,
-          pot: newPot,
-          currentBet: newCurrentBet,
-          lastAction: { player: currentPlayer.name, action, amount },
-        };
+      if (allAllIn || (activePlayers.length <= 1 && updatedPlayers.filter(p => !p.hasFolded).length > 1)) {
+        let runOutState: GameState = newState;
         
         // Fast-forward through remaining phases
-        while (newState.phase !== 'river' && newState.phase !== 'showdown' && newState.phase !== 'finished') {
-          newState = advanceToNextPhase(newState);
+        while (runOutState.phase !== 'river' && runOutState.phase !== 'showdown' && runOutState.phase !== 'finished') {
+          runOutState = advanceToNextPhase(runOutState);
         }
         
-        if (newState.phase === 'river') {
-          return determineWinner(newState);
+        if (runOutState.phase === 'river') {
+          return determineWinner(runOutState);
         }
-        return newState;
+        return runOutState;
       }
 
       // If all active players have acted and bets are equal, advance phase
       if (allActed && betsEqual) {
-        const newState: GameState = {
-          ...prev,
-          players: updatedPlayers,
-          pot: newPot,
-          currentBet: newCurrentBet,
-          lastAction: { player: currentPlayer.name, action, amount },
-        };
-        
         if (prev.phase === 'river') {
           return determineWinner(newState);
         }
@@ -298,12 +310,8 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
       const nextPlayerIndex = (playerIndex + 1) % 2;
 
       return {
-        ...prev,
-        players: updatedPlayers,
-        pot: newPot,
-        currentBet: newCurrentBet,
+        ...newState,
         currentPlayerIndex: nextPlayerIndex,
-        lastAction: { player: currentPlayer.name, action, amount },
       };
     });
   }, [advanceToNextPhase, determineWinner]);
@@ -325,7 +333,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     setState(prev => ({ ...prev, aiThinking: true }));
 
     getAIDecision(state).then(decision => {
-      processAction(decision.action, decision.raiseAmount);
+      processAction(decision.action, decision.raiseAmount, decision.thinking);
       setState(prev => ({ ...prev, aiThinking: false }));
       aiThinkingRef.current = false;
     }).catch(() => {
@@ -336,6 +344,16 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
       aiThinkingRef.current = false;
     });
   }, [state.currentPlayerIndex, state.phase, processAction, state.currentBet]);
+
+  // Auto-advance from showdown to finished
+  useEffect(() => {
+    if (state.phase === 'showdown' && state.showdownRevealed) {
+      const timer = setTimeout(() => {
+        setState(prev => determineWinner(prev));
+      }, 2000); // 2 second delay to show cards
+      return () => clearTimeout(timer);
+    }
+  }, [state.phase, state.showdownRevealed, determineWinner]);
 
   const startGame = useCallback(() => {
     const deck = shuffleDeck(createDeck());
@@ -353,13 +371,14 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
       const newPlayers = prev.players.map((p, i) => {
         const isDealer = i === sbIndex;
         const blindAmount = isDealer ? SMALL_BLIND : BIG_BLIND;
-        const chips = p.chips - Math.min(blindAmount, p.chips);
+        const actualBlind = Math.min(blindAmount, p.chips);
+        const chips = p.chips - actualBlind;
         
         return {
           ...p,
           chips,
-          currentBet: Math.min(blindAmount, p.chips + blindAmount),
-          totalBet: Math.min(blindAmount, p.chips + blindAmount),
+          currentBet: actualBlind,
+          totalBet: actualBlind,
           cards: i === 0 ? playerCards : aiCards,
           isDealer,
           hasFolded: false,
@@ -385,6 +404,10 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
         winningHand: null,
         lastAction: null,
         aiThinking: false,
+        aiCommentary: null,
+        showdownRevealed: false,
+        isTie: false,
+        tiedPlayers: undefined,
       };
     });
   }, []);
@@ -428,17 +451,26 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
       // Calculate new chip counts
       const playerChips = prev.players.map((p, i) => {
         let chips = p.chips;
-        if (prev.winner?.id === p.id) {
+        
+        if (prev.isTie && prev.tiedPlayers) {
+          // Split pot for tie
+          chips += Math.floor(prev.pot / prev.tiedPlayers.length);
+        } else if (prev.winner?.id === p.id) {
           chips += prev.pot;
         }
+        
         return chips;
       });
 
+      // Check if either player is eliminated
+      const anyEliminated = playerChips.some(c => c <= 0);
+
       return {
         ...createInitialState(initialBuyInRef.current),
+        phase: anyEliminated ? 'waiting' : 'waiting',
         players: prev.players.map((p, i) => ({
           ...createInitialState(initialBuyInRef.current).players[i],
-          chips: playerChips[i],
+          chips: Math.max(0, playerChips[i]),
           isDealer: i === newDealerIndex,
         })),
         dealerIndex: newDealerIndex,
