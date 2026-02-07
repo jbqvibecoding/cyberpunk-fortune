@@ -169,27 +169,7 @@ const PowerballGame = () => {
 
                 {/* Purchase Controls */}
                 <div className="mt-6 cyber-card p-6">
-                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <span className="text-muted-foreground font-mono">TICKETS:</span>
-                      <div className="flex items-center gap-2">
-                        {[1, 2, 5, 10, 20].map(n => (
-                          <button
-                            key={n}
-                            onClick={() => actions.setTicketCount(n)}
-                            className={cn(
-                              'w-10 h-10 rounded-lg font-mono font-bold transition-all',
-                              state.ticketCount === n
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                            )}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
+                <div className="flex items-center justify-center">
                     <button
                       onClick={actions.buyTickets}
                       disabled={!isComplete}
@@ -199,9 +179,9 @@ const PowerballGame = () => {
                       )}
                     >
                       <Zap className="h-5 w-5" />
-                      BUY {state.ticketCount} TICKET{state.ticketCount > 1 ? 'S' : ''} ({(0.01 * state.ticketCount).toFixed(2)} ETH)
+                      BUY 1 TICKET (0.01 ETH)
                     </button>
-                  </div>
+                </div>
                 </div>
               </div>
 
