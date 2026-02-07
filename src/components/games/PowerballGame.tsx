@@ -78,15 +78,6 @@ const PowerballGame = () => {
                 </div>
               </div>
 
-              {/* Demo Draw Button */}
-              <button
-                onClick={handleDraw}
-                disabled={state.isDrawing}
-                className="mt-4 cyber-btn bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 flex items-center gap-2 mx-auto"
-              >
-                <Play className="h-4 w-4" />
-                {state.isDrawing ? 'DRAWING...' : 'SIMULATE DRAW (DEMO)'}
-              </button>
             </div>
           </div>
 
