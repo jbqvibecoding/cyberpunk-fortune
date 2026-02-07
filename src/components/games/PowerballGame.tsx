@@ -6,6 +6,7 @@ import { TicketHistory } from './powerball/TicketHistory';
 import { PrizeTiers } from './powerball/PrizeTiers';
 import { DrawHistory } from './powerball/DrawHistory';
 import { NumberSelector } from './powerball/NumberSelector';
+import { PlayModeSelector } from './powerball/PlayModeSelector';
 import { cn } from '@/lib/utils';
 
 const PowerballGame = () => {
@@ -167,9 +168,19 @@ const PowerballGame = () => {
                   onFillRemaining={actions.fillRemaining}
                 />
 
+                {/* Play Mode Selector */}
+                <div className="mt-6">
+                  <PlayModeSelector
+                    selectedMode={state.playMode}
+                    onSelectMode={actions.setPlayMode}
+                    hasDoublePlayNFT={state.hasDoublePlayNFT}
+                    hasNoLossNFT={state.hasNoLossNFT}
+                  />
+                </div>
+
                 {/* Purchase Controls */}
                 <div className="mt-6 cyber-card p-6">
-                <div className="flex items-center justify-center">
+                  <div className="flex items-center justify-center">
                     <button
                       onClick={actions.buyTickets}
                       disabled={!isComplete}
@@ -179,9 +190,23 @@ const PowerballGame = () => {
                       )}
                     >
                       <Zap className="h-5 w-5" />
-                      BUY 1 TICKET (0.01 ETH)
+                      {state.playMode === 'no-loss'
+                        ? 'BUY 1 NOLOSS TICKET (0.01 ETH)'
+                        : state.playMode === 'double-play'
+                        ? 'BUY 1 DOUBLE PLAY TICKET (0.01 ETH)'
+                        : 'BUY 1 TICKET (0.01 ETH)'}
                     </button>
-                </div>
+                  </div>
+                  {state.playMode === 'no-loss' && (
+                    <p className="text-center text-[11px] text-muted-foreground mt-2">
+                      Principal routed to DeFi yield pool ({state.noLossPool.toFixed(4)} ETH) — redeemable anytime
+                    </p>
+                  )}
+                  {state.playMode === 'double-play' && (
+                    <p className="text-center text-[11px] text-muted-foreground mt-2">
+                      Your ticket enters 2 consecutive draws automatically
+                    </p>
+                  )}
                 </div>
               </div>
 

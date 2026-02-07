@@ -1,5 +1,5 @@
 import { PowerballTicket } from '@/hooks/usePowerball';
-import { Ticket, Trophy, X, Check } from 'lucide-react';
+import { Ticket, Trophy, X, Repeat, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TicketHistoryProps {
@@ -48,6 +48,26 @@ export function TicketHistory({ tickets, lastDrawNumbers = [], lastDrawPowerball
                   : 'bg-card/50 border-border/30'
               )}
             >
+              {/* Play mode badge */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1">
+                  {ticket.playMode === 'double-play' && (
+                    <span className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/30">
+                      <Repeat className="h-3 w-3" />
+                      DOUBLE R{ticket.drawRound}
+                    </span>
+                  )}
+                  {ticket.playMode === 'no-loss' && (
+                    <span className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/30">
+                      <ShieldCheck className="h-3 w-3" />
+                      NOLOSS
+                    </span>
+                  )}
+                </div>
+                {ticket.playMode === 'no-loss' && ticket.principalRedeemable && (
+                  <span className="text-[10px] font-mono text-accent">REDEEMABLE</span>
+                )}
+              </div>
               <div className="flex items-center gap-2 mb-2">
                 {ticket.numbers.map((num, i) => {
                   const isMatch = lastDrawNumbers.includes(num);
