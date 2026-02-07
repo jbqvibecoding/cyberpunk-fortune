@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 
+export type PlayMode = 'standard' | 'double-play' | 'no-loss';
+
 export interface PowerballTicket {
   id: string;
   numbers: number[];
@@ -9,6 +11,9 @@ export interface PowerballTicket {
   matchedNumbers: number;
   matchedPowerball: boolean;
   prize: number;
+  playMode: PlayMode;
+  drawRound: number; // 1 = primary, 2 = second (double-play)
+  principalRedeemable: boolean; // for no-loss tickets
 }
 
 export interface DrawResult {
@@ -30,6 +35,10 @@ export interface PowerballState {
   isDrawing: boolean;
   countdown: { hours: number; minutes: number; seconds: number };
   totalTicketsSold: number;
+  playMode: PlayMode;
+  hasDoublePlayNFT: boolean;
+  hasNoLossNFT: boolean;
+  noLossPool: number; // DeFi yield pool balance
 }
 
 const PRIZE_TIERS = [
@@ -56,6 +65,10 @@ export function usePowerball() {
     isDrawing: false,
     countdown: { hours: 12, minutes: 34, seconds: 56 },
     totalTicketsSold: 4892,
+    playMode: 'standard',
+    hasDoublePlayNFT: true, // Simulated: true for demo
+    hasNoLossNFT: true, // Simulated: true for demo
+    noLossPool: 3.42, // Simulated DeFi yield pool
   });
 
   // Countdown timer
@@ -139,12 +152,20 @@ export function usePowerball() {
     setState(prev => ({ ...prev, selectedNumbers: [], powerball: null }));
   }, []);
 
+  const setPlayMode = useCallback((mode: PlayMode) => {
+    setState(prev => ({ ...prev, playMode: mode }));
+  }, []);
+
   const buyTickets = useCallback(() => {
     setState(prev => {
       if (prev.selectedNumbers.length !== 5 || prev.powerball === null) return prev;
-      
+
+      const isNoLoss = prev.playMode === 'no-loss' && prev.hasNoLossNFT;
+      const isDoublePlay = prev.playMode === 'double-play' && prev.hasDoublePlayNFT;
+
       const newTickets: PowerballTicket[] = [];
       for (let i = 0; i < prev.ticketCount; i++) {
+        // Primary ticket (draw round 1)
         newTickets.push({
           id: `ticket-${Date.now()}-${i}`,
           numbers: [...prev.selectedNumbers],
@@ -154,16 +175,45 @@ export function usePowerball() {
           matchedNumbers: 0,
           matchedPowerball: false,
           prize: 0,
+          playMode: prev.playMode,
+          drawRound: 1,
+          principalRedeemable: isNoLoss,
         });
+
+        // Double Play: add a second-round ticket with same numbers
+        if (isDoublePlay) {
+          newTickets.push({
+            id: `ticket-${Date.now()}-${i}-r2`,
+            numbers: [...prev.selectedNumbers],
+            powerball: prev.powerball!,
+            timestamp: new Date(),
+            cost: 0, // No extra cost for second round
+            matchedNumbers: 0,
+            matchedPowerball: false,
+            prize: 0,
+            playMode: 'double-play',
+            drawRound: 2,
+            principalRedeemable: false,
+          });
+        }
       }
-      
+
+      // NoLoss: principal goes to DeFi yield pool, not jackpot
+      const jackpotIncrease = isNoLoss
+        ? 0
+        : 0.01 * prev.ticketCount * 0.5;
+      const noLossIncrease = isNoLoss
+        ? 0.01 * prev.ticketCount
+        : 0;
+
       return {
         ...prev,
         tickets: [...newTickets, ...prev.tickets],
         selectedNumbers: [],
         powerball: null,
         totalTicketsSold: prev.totalTicketsSold + prev.ticketCount,
-        currentJackpot: prev.currentJackpot + (0.01 * prev.ticketCount * 0.5), // 50% to jackpot
+        currentJackpot: prev.currentJackpot + jackpotIncrease,
+        noLossPool: prev.noLossPool + noLossIncrease,
       };
     });
   }, []);
@@ -182,7 +232,7 @@ export function usePowerball() {
 
   const simulateDraw = useCallback(() => {
     setState(prev => ({ ...prev, isDrawing: true }));
-    
+
     // Simulate VRF delay
     setTimeout(() => {
       const winningNumbers = Array.from({ length: 69 }, (_, i) => i + 1)
@@ -190,6 +240,13 @@ export function usePowerball() {
         .slice(0, 5)
         .sort((a, b) => a - b);
       const winningPowerball = Math.floor(Math.random() * 26) + 1;
+
+      // Generate a second set of winning numbers for double-play round 2
+      const winningNumbers2 = Array.from({ length: 69 }, (_, i) => i + 1)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 5)
+        .sort((a, b) => a - b);
+      const winningPowerball2 = Math.floor(Math.random() * 26) + 1;
 
       const newDraw: DrawResult = {
         id: `draw-${Date.now()}`,
@@ -202,10 +259,19 @@ export function usePowerball() {
       setState(prev => {
         // Check tickets against draw
         const updatedTickets = prev.tickets.map(ticket => {
-          const matchedNumbers = ticket.numbers.filter(n => winningNumbers.includes(n)).length;
-          const matchedPowerball = ticket.powerball === winningPowerball;
-          const { prize } = calculatePrize(matchedNumbers, matchedPowerball, prev.currentJackpot);
-          
+          // Round 2 tickets use the second set of winning numbers
+          const drawNumbers = ticket.drawRound === 2 ? winningNumbers2 : winningNumbers;
+          const drawPowerball = ticket.drawRound === 2 ? winningPowerball2 : winningPowerball;
+
+          const matchedNumbers = ticket.numbers.filter(n => drawNumbers.includes(n)).length;
+          const matchedPowerball = ticket.powerball === drawPowerball;
+
+          // NoLoss tickets win from the interest pool, not the main jackpot
+          const jackpotForCalc = ticket.playMode === 'no-loss'
+            ? prev.noLossPool
+            : prev.currentJackpot;
+          const { prize } = calculatePrize(matchedNumbers, matchedPowerball, jackpotForCalc);
+
           return {
             ...ticket,
             matchedNumbers,
@@ -214,7 +280,12 @@ export function usePowerball() {
           };
         });
 
-        const jackpotWon = updatedTickets.some(t => t.matchedNumbers === 5 && t.matchedPowerball);
+        const jackpotWon = updatedTickets.some(
+          t => t.matchedNumbers === 5 && t.matchedPowerball && t.playMode !== 'no-loss'
+        );
+
+        // Simulate DeFi yield: noLossPool grows slightly each draw
+        const yieldGain = prev.noLossPool * 0.003; // ~0.3% per draw cycle
 
         return {
           ...prev,
@@ -222,8 +293,9 @@ export function usePowerball() {
           lastDraw: newDraw,
           drawHistory: [newDraw, ...prev.drawHistory].slice(0, 10),
           tickets: updatedTickets,
-          currentJackpot: jackpotWon ? 10 : prev.currentJackpot * 1.1, // Reset or grow jackpot
+          currentJackpot: jackpotWon ? 10 : prev.currentJackpot * 1.1,
           countdown: { hours: 23, minutes: 59, seconds: 59 },
+          noLossPool: prev.noLossPool + yieldGain,
         };
       });
     }, 3000);
@@ -242,6 +314,7 @@ export function usePowerball() {
       clearSelection,
       buyTickets,
       simulateDraw,
+      setPlayMode,
     },
     isComplete,
     prizeTiers: PRIZE_TIERS,
