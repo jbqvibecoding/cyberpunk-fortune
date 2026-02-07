@@ -1,73 +1,147 @@
-# Welcome to your Lovable project
+# Pioneer — Cyberpunk Web3 Gaming Platform
 
-## Project info
+> 去中心化博彩游戏平台 · Ethereum Sepolia · Chainlink VRF · React 18
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+[![License: MIT](https://img.shields.io/badge/License-MIT-cyan.svg)](LICENSE)
 
-## How can I edit this code?
+## 功能
 
-There are several ways of editing your application.
+| 游戏 | 说明 | 链上技术 |
+|------|------|---------|
+| **Cyber-Powerball** | 选 5 个主球 + 1 个强力球，Chainlink VRF 开奖 | VRF V2 + Automation |
+| **Texas Hold'em AI Duel** | 1v1 对战 LLM AI，Chainlink VRF 发牌 | VRF V2 + Functions (预留) |
 
-**Use Lovable**
+**双模式运行**：合约部署前为模拟模式（前端纯本地），部署后自动切换为链上模式。
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## 快速开始（3 分钟）
 
-**Use your preferred IDE**
+```bash
+git clone https://github.com/jbqvibecoding/cyberpunk-fortune.git
+cd cyberpunk-fortune
+npm install
+cp .env.example .env        # 编辑 .env，填入 VITE_WALLETCONNECT_PROJECT_ID
+npm run dev                  # → http://localhost:8080
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+无需部署合约即可体验全部 UI 和模拟功能。
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+> 📖 详细搭建步骤见 **[docs/QUICK_START.md](docs/QUICK_START.md)**
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 技术栈
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+| 层级 | 技术 |
+|------|------|
+| **前端** | React 18 · TypeScript · Vite · Tailwind CSS · shadcn/ui |
+| **Web3** | wagmi v2 · viem · ethers v6 · RainbowKit |
+| **合约** | Solidity 0.8.19 · Hardhat · OpenZeppelin 4.9 · Chainlink VRF/Functions/Automation |
+| **网络** | Ethereum Sepolia Testnet |
 
-# Step 3: Install the necessary dependencies.
-npm i
+---
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## 合约部署（进阶）
+
+### 前置条件
+
+- Sepolia ETH ≥ 0.5 ETH → [领取](https://sepoliafaucet.com/)
+- Sepolia LINK ≥ 25 LINK → [领取](https://faucets.chain.link/sepolia)
+- Chainlink VRF Subscription → [创建](https://vrf.chain.link)
+- Chainlink Functions Subscription → [创建](https://functions.chain.link)
+
+### 部署流程
+
+```bash
+# 1. 配置环境变量
+cp .env.example .env
+# 填入: DEPLOYER_PRIVATE_KEY, VRF_SUBSCRIPTION_ID, FUNCTIONS_SUBSCRIPTION_ID 等
+
+# 2. 编译合约
+npx hardhat compile
+
+# 3. 部署 Powerball
+npx hardhat run scripts/deploy-powerball.ts --network sepolia
+
+# 4. 部署 Poker
+npx hardhat run scripts/deploy-poker.ts --network sepolia
+
+# 5. 将输出的合约地址填入 .env:
+#    VITE_CYBERPOWERBALL_ADDRESS=0x...
+#    VITE_TEXASHOLDEM_ADDRESS=0x...
+
+# 6. 配置 Chainlink（VRF Consumer + Automation Upkeep + Functions Consumer）
+
+# 7. 重启前端
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+> 📖 完整步骤见 **[docs/DEPLOYMENT_AND_TESTING.md](docs/DEPLOYMENT_AND_TESTING.md)**
+>
+> 📖 Chainlink 配置详解见 **[docs/CHAINLINK_SETUP.md](docs/CHAINLINK_SETUP.md)**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 项目结构
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+├── contracts/                   Solidity 智能合约
+│   ├── CyberPowerball.sol       彩票 (VRF + Automation)
+│   ├── TexasHoldemAIDuel.sol    扑克 (VRF + Functions)
+│   └── ...                      NFTPass, Token, Registry 等
+├── scripts/                     Hardhat 部署脚本
+├── src/
+│   ├── components/              React UI 组件
+│   ├── hooks/                   游戏逻辑 Hooks（链上+模拟混合）
+│   ├── lib/contracts/           ABI + 合约地址配置
+│   └── lib/wagmi.ts             Web3 Provider 配置
+├── docs/                        完整文档
+│   ├── QUICK_START.md           新人搭建指南
+│   ├── DEPLOYMENT_AND_TESTING.md 部署与测试指南
+│   └── CHAINLINK_SETUP.md      Chainlink 服务配置
+├── hardhat.config.cjs           Hardhat 配置
+└── .env.example                 环境变量模板
+```
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## 文档索引
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+| 文档 | 内容 | 适合谁 |
+|------|------|--------|
+| [docs/QUICK_START.md](docs/QUICK_START.md) | 从零搭建项目，含常见问题 | 新成员、初次使用者 |
+| [docs/DEPLOYMENT_AND_TESTING.md](docs/DEPLOYMENT_AND_TESTING.md) | 合约部署、功能测试清单、Etherscan 验证 | 开发者、部署者 |
+| [docs/CHAINLINK_SETUP.md](docs/CHAINLINK_SETUP.md) | VRF/Automation/Functions 配置详解 | 合约运维、进阶开发 |
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 环境变量
 
-## Can I connect a custom domain to my Lovable project?
+| 变量 | 必填 | 说明 |
+|------|:----:|------|
+| `VITE_WALLETCONNECT_PROJECT_ID` | ✅ | [WalletConnect Cloud](https://cloud.walletconnect.com/) |
+| `VITE_SEPOLIA_RPC_URL` | 可选 | Alchemy/Infura Sepolia RPC |
+| `VITE_CYBERPOWERBALL_ADDRESS` | 部署后 | CyberPowerball 合约地址 |
+| `VITE_TEXASHOLDEM_ADDRESS` | 部署后 | TexasHoldemAIDuel 合约地址 |
+| `DEPLOYER_PRIVATE_KEY` | 部署时 | 部署者钱包私钥 |
+| `VRF_SUBSCRIPTION_ID` | 部署时 | Chainlink VRF 订阅 ID |
+| `FUNCTIONS_SUBSCRIPTION_ID` | 部署时 | Chainlink Functions 订阅 ID |
+| `ETHERSCAN_API_KEY` | 可选 | 合约验证用 |
 
-Yes, you can!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 常用命令
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+npm run dev          # 启动开发服务器
+npm run build        # 生产构建
+npx hardhat compile  # 编译合约
+npx hardhat console --network sepolia  # Sepolia 交互控制台
+```
+
+---
+
+## License
+
+MIT

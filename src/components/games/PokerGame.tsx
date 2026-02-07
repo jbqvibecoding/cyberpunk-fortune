@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usePokerGame } from '@/hooks/usePokerGame';
+import { useAccount } from 'wagmi';
+import { CONTRACTS } from '@/lib/contracts/addresses';
 import { PokerTable } from './poker/PokerTable';
 import { BettingControls } from './poker/BettingControls';
 import { WinnerDisplay } from './poker/WinnerDisplay';
@@ -27,6 +29,8 @@ export default function PokerGame() {
   
   // This hook MUST be called unconditionally - never inside conditions
   const { state, actions } = usePokerGame(buyIn);
+  const { isConnected } = useAccount();
+  const isOnChain = isConnected && CONTRACTS.TexasHoldem !== '0x0000000000000000000000000000000000000000';
 
   // Track hand results - useEffect at top level, conditional logic inside
   useEffect(() => {
@@ -207,6 +211,20 @@ export default function PokerGame() {
           <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
             Challenge our LLM-powered AI in heads-up poker. All cards dealt via Chainlink VRF.
           </p>
+          {/* On-chain / Simulation badge */}
+          <div className="mt-3 flex justify-center">
+            {isOnChain ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-xs font-mono">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                ON-CHAIN · SEPOLIA
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-xs font-mono">
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                SIMULATION MODE
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="max-w-3xl mx-auto">

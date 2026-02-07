@@ -46,6 +46,20 @@ const PowerballGame = () => {
           <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
             Select 5 numbers (1-69) and 1 Powerball (1-26). All draws are verified on-chain using Chainlink VRF.
           </p>
+          {/* On-chain / Simulation badge */}
+          <div className="mt-3 flex justify-center">
+            {state.onChainMode ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-xs font-mono">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                ON-CHAIN · SEPOLIA
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-xs font-mono">
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                SIMULATION MODE
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="max-w-5xl mx-auto">
@@ -174,19 +188,34 @@ const PowerballGame = () => {
                   <div className="flex items-center justify-center">
                     <button
                       onClick={actions.buyTickets}
-                      disabled={!isComplete}
+                      disabled={!isComplete || state.isBuyingOnChain}
                       className={cn(
                         'cyber-btn-primary flex items-center gap-2 text-lg px-8 py-3',
-                        !isComplete && 'opacity-50 cursor-not-allowed'
+                        (!isComplete || state.isBuyingOnChain) && 'opacity-50 cursor-not-allowed'
                       )}
                     >
                       <Zap className="h-5 w-5" />
-                      {state.playMode === 'no-loss'
+                      {state.isBuyingOnChain
+                        ? 'CONFIRMING TX...'
+                        : state.playMode === 'no-loss'
                         ? 'BUY 1 NOLOSS TICKET (0.01 ETH)'
                         : state.playMode === 'double-play'
                         ? 'BUY 1 DOUBLE PLAY TICKET (0.01 ETH)'
                         : 'BUY 1 TICKET (0.01 ETH)'}
                     </button>
+                    {state.txHash && (
+                      <p className="text-center text-[11px] text-muted-foreground mt-2">
+                        TX:{' '}
+                        <a
+                          href={`https://sepolia.etherscan.io/tx/${state.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline font-mono"
+                        >
+                          {state.txHash.slice(0, 10)}...{state.txHash.slice(-8)}
+                        </a>
+                      </p>
+                    )}
                   </div>
                   {state.playMode === 'no-loss' && (
                     <p className="text-center text-[11px] text-muted-foreground mt-2">

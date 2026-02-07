@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import "@chainlink/contracts/src/v0.8/functions/FunctionsClient.sol";
+import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+import "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./libraries/PokerHandEvaluator.sol";
@@ -80,6 +80,13 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
     bytes32 public vrfKeyHash;
     uint32 public vrfCallbackGasLimit = 500000;
     uint16 public vrfRequestConfirmations = 3;
+    // VRF response timeout for retries
+    uint256 public vrfResponseTimeout = 1 hours;
+    // mappings to store randomness hash and timestamps
+    mapping(uint256 => bytes32) public vrfRequestRandomnessHash;
+    mapping(uint256 => uint256) public vrfRequestTimestamp;
+    // game -> latest vrf request
+    mapping(uint256 => uint256) public gameToVrfRequest;
 
     // Chainlink Functions
     bytes32 public functionsSourceHash;
@@ -92,6 +99,11 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
     uint256 public smallBlind = 5;  // Chips, not ETH
     uint256 public bigBlind = 10;
     uint256 public aiResponseTimeout = 30 seconds;
+    // House fee (basis points) and house balance
+    uint16 public houseFeeBps;
+    uint256 public houseBalance;
+    // Pending withdrawals for players (pull pattern)
+    mapping(address => uint256) public pendingWithdrawals;
 
     // Game state
     uint256 public gameCounter;
@@ -117,6 +129,10 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
     event HandCompleted(uint256 indexed gameId, bool playerWon, uint256 pot, string handDescription);
     event GameEnded(uint256 indexed gameId, bool playerWon, uint256 finalChips);
     event AICommitment(uint256 indexed gameId, bytes32 commitment);
+    event RandomnessRevealed(uint256 indexed requestId, bytes32 randomnessHash);
+    event RandomWordsFulfilled(uint256 indexed requestId, uint256[] randomWords);
+    event WithdrawalPending(address indexed user, uint256 amount);
+    event WithdrawalExecuted(address indexed user, uint256 amount);
 
     // ============ Errors ============
     
@@ -157,8 +173,11 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
         uint256 gameId = gameCounter;
         activeGame[msg.sender] = gameId;
 
-        // Convert ETH to chips (1 ETH = 10000 chips)
-        uint256 chips = (msg.value * 10000) / 1 ether;
+        // Apply house fee and convert ETH to chips (1 ETH = 10000 chips)
+        uint256 fee = (uint256(msg.value) * uint256(houseFeeBps)) / 10000;
+        uint256 net = msg.value - fee;
+        houseBalance += fee;
+        uint256 chips = (net * 10000) / 1 ether;
 
         games[gameId] = Game({
             player: msg.sender,
@@ -316,7 +335,7 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
         if (game.playerTurn) revert InvalidAction();
         if (block.timestamp < game.lastActionTime + aiResponseTimeout) revert InvalidAction();
 
-        // Player wins the pot due to AI timeout
+        // Player wins the pot due to AI timeout (chips updated)
         game.playerChips += game.pot;
         game.pot = 0;
 
@@ -356,8 +375,8 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
         emit GameEnded(gameId, playerWon, game.playerChips);
 
         if (payout > 0) {
-            (bool success, ) = payable(msg.sender).call{value: payout}("");
-            require(success, "Transfer failed");
+            pendingWithdrawals[msg.sender] += payout;
+            emit WithdrawalPending(msg.sender, payout);
         }
     }
 
@@ -375,6 +394,8 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
             9  // 2 player + 2 AI + 5 community = 9 cards
         );
         vrfRequestToGame[requestId] = gameId;
+        gameToVrfRequest[gameId] = requestId;
+        vrfRequestTimestamp[requestId] = block.timestamp;
     }
 
     /**
@@ -386,6 +407,12 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
     ) internal override {
         uint256 gameId = vrfRequestToGame[requestId];
         Game storage game = games[gameId];
+
+        // Store and emit randomness hash for transparency
+        bytes32 randomnessHash = keccak256(abi.encode(randomWords));
+        vrfRequestRandomnessHash[requestId] = randomnessHash;
+        emit RandomnessRevealed(requestId, randomnessHash);
+        emit RandomWordsFulfilled(requestId, randomWords);
 
         // Shuffle and deal cards
         uint8[52] memory deck = _createDeck();
@@ -756,6 +783,58 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
         return deck;
     }
 
+    /**
+     * @notice Withdraw available pending prizes
+     */
+    function withdrawPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert("Nothing to withdraw");
+
+        pendingWithdrawals[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+        emit WithdrawalExecuted(msg.sender, amount);
+    }
+
+    /**
+     * @notice Set house fee in basis points
+     */
+    function setHouseFeeBps(uint16 _bps) external onlyOwner {
+        houseFeeBps = _bps;
+    }
+
+    /**
+     * @notice Withdraw accumulated house fees
+     */
+    function withdrawHouseFees(address to, uint256 amount) external onlyOwner {
+        require(amount <= houseBalance, "Amount exceeds house balance");
+        houseBalance -= amount;
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    /**
+     * @notice Retry VRF request for a game if previous request timed out
+     */
+    function retryDeal(uint256 gameId) external onlyOwner {
+        uint256 prevRequest = gameToVrfRequest[gameId];
+        require(prevRequest != 0, "No prior request");
+        require(vrfRequestRandomnessHash[prevRequest] == bytes32(0), "Already fulfilled");
+        require(block.timestamp >= vrfRequestTimestamp[prevRequest] + vrfResponseTimeout, "Not timed out");
+
+        uint256 newRequestId = vrfCoordinator.requestRandomWords(
+            vrfKeyHash,
+            vrfSubscriptionId,
+            vrfRequestConfirmations,
+            vrfCallbackGasLimit,
+            9
+        );
+
+        vrfRequestToGame[newRequestId] = gameId;
+        gameToVrfRequest[gameId] = newRequestId;
+        vrfRequestTimestamp[newRequestId] = block.timestamp;
+    }
+
     function _decodeCard(uint8 encoded) internal pure returns (PokerHandEvaluator.Card memory) {
         return PokerHandEvaluator.Card({
             rank: (encoded / 4) + 2,  // 0-12 -> 2-14
@@ -881,6 +960,26 @@ contract TexasHoldemAIDuel is VRFConsumerBaseV2, FunctionsClient, Ownable, Reent
     function withdrawAIBank(uint256 amount) external onlyOwner {
         (bool success, ) = payable(owner()).call{value: amount}("");
         require(success, "Transfer failed");
+    }
+
+    // ============ Chainlink Functions Callback ============
+
+    /**
+     * @notice Callback for Chainlink Functions responses
+     * @dev Currently AI decisions are simulated on-chain via _simulateAIDecision.
+     *      When switching to real Chainlink Functions, parse the response here
+     *      and call _executeAIAction with the decoded action.
+     */
+    function _fulfillRequest(
+        bytes32 requestId,
+        bytes memory response,
+        bytes memory err
+    ) internal override {
+        uint256 gameId = functionsRequestToGame[requestId];
+        if (gameId == 0) return; // unknown request
+
+        // TODO: Parse LLM response from `response` bytes and execute AI action
+        // For now this is a no-op since we use _simulateAIDecision instead
     }
 
     receive() external payable {}

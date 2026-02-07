@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -49,17 +49,31 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
     uint32 public callbackGasLimit = 500000;
     uint16 public requestConfirmations = 3;
     uint32 public numWords = 6; // 5 main + 1 powerball
+    // VRF response timeout (if not fulfilled within this, owner can retry)
+    uint256 public vrfResponseTimeout = 1 hours;
 
     // Game state
     uint256 public currentRoundId;
     uint256 public ticketPrice = 0.01 ether;
     uint256 public drawInterval = 1 days;
     uint256 public nextDrawTime;
+    // House fee in basis points (e.g., 200 = 2%)
+    uint16 public houseFeeBps;
+    // Accumulated house balance (in wei)
+    uint256 public houseBalance;
+    // Pending withdrawals for players (pull pattern)
+    mapping(address => uint256) public pendingWithdrawals;
 
     // Mappings
     mapping(uint256 => Round) public rounds;
     mapping(uint256 => Ticket) public tickets;
     mapping(uint256 => uint256) public vrfRequestToRound;
+    // reverse mapping: round -> latest vrf request
+    mapping(uint256 => uint256) public roundToVrfRequest;
+    // store randomness hash for transparency (keccak256 of randomWords)
+    mapping(uint256 => bytes32) public vrfRequestRandomnessHash;
+    // store timestamp when request was made
+    mapping(uint256 => uint256) public vrfRequestTimestamp;
     mapping(uint256 => mapping(address => uint256[])) public playerTickets;
     
     uint256 public totalTickets;
@@ -77,6 +91,8 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
         uint8 powerball
     );
     event DrawRequested(uint256 indexed roundId, uint256 requestId);
+    event RandomnessRevealed(uint256 indexed requestId, bytes32 randomnessHash);
+    event RandomWordsFulfilled(uint256 indexed requestId, uint256[] randomWords);
     event DrawCompleted(
         uint256 indexed roundId,
         uint8[5] winningMainNumbers,
@@ -90,6 +106,8 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
     );
     event RoundStarted(uint256 indexed roundId, uint256 drawTime);
     event JackpotRollover(uint256 indexed fromRound, uint256 indexed toRound, uint256 amount);
+    event WithdrawalPending(address indexed user, uint256 amount);
+    event WithdrawalExecuted(address indexed user, uint256 amount);
 
     // ============ Errors ============
     
@@ -102,6 +120,8 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
     error AlreadyClaimed();
     error NoPrize();
     error InsufficientPayment();
+
+    error NothingToWithdraw();
 
     // ============ Constructor ============
     
@@ -174,8 +194,11 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
             claimed: false
         });
 
-        // Update round
-        rounds[currentRoundId].prizePool += msg.value;
+        // Apply house fee and update round
+        uint256 fee = (uint256(msg.value) * uint256(houseFeeBps)) / 10000;
+        uint256 net = msg.value - fee;
+        rounds[currentRoundId].prizePool += net;
+        houseBalance += fee;
         rounds[currentRoundId].ticketCount++;
         playerTickets[currentRoundId][msg.sender].push(ticketId);
 
@@ -231,7 +254,11 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
             claimed: false
         });
 
-        rounds[currentRoundId].prizePool += msg.value;
+        // Apply house fee and update round
+        uint256 fee = (uint256(msg.value) * uint256(houseFeeBps)) / 10000;
+        uint256 net = msg.value - fee;
+        rounds[currentRoundId].prizePool += net;
+        houseBalance += fee;
         rounds[currentRoundId].ticketCount++;
         playerTickets[currentRoundId][msg.sender].push(ticketId);
 
@@ -255,10 +282,23 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
 
         ticket.claimed = true;
 
-        (bool success, ) = payable(msg.sender).call{value: prize}("");
-        require(success, "Transfer failed");
-
+        // Use pull pattern: credit pending withdrawals
+        pendingWithdrawals[msg.sender] += prize;
         emit PrizeClaimed(msg.sender, ticketId, prize, tier);
+        emit WithdrawalPending(msg.sender, prize);
+    }
+
+    /**
+     * @notice Withdraw available pending prizes
+     */
+    function withdrawPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+
+        pendingWithdrawals[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+        emit WithdrawalExecuted(msg.sender, amount);
     }
 
     // ============ Chainlink Automation ============
@@ -302,6 +342,8 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
         );
 
         vrfRequestToRound[requestId] = currentRoundId;
+        roundToVrfRequest[currentRoundId] = requestId;
+        vrfRequestTimestamp[requestId] = block.timestamp;
 
         emit DrawRequested(currentRoundId, requestId);
     }
@@ -317,6 +359,12 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
     ) internal override {
         uint256 roundId = vrfRequestToRound[requestId];
         Round storage round = rounds[roundId];
+
+        // Store and emit randomness hash for transparency
+        bytes32 randomnessHash = keccak256(abi.encode(randomWords));
+        vrfRequestRandomnessHash[requestId] = randomnessHash;
+        emit RandomnessRevealed(requestId, randomnessHash);
+        emit RandomWordsFulfilled(requestId, randomWords);
 
         // Generate winning main numbers (1-69)
         bool[70] memory used;
@@ -482,6 +530,23 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
         emit RoundStarted(currentRoundId, nextDrawTime);
     }
 
+    /**
+     * @notice Set house fee in basis points
+     */
+    function setHouseFeeBps(uint16 _bps) external onlyOwner {
+        houseFeeBps = _bps;
+    }
+
+    /**
+     * @notice Withdraw accumulated house fees
+     */
+    function withdrawHouseFees(address to, uint256 amount) external onlyOwner {
+        require(amount <= houseBalance, "Amount exceeds house balance");
+        houseBalance -= amount;
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
     function _checkJackpotWinners(uint256 roundId) internal view returns (bool) {
         Round storage round = rounds[roundId];
         
@@ -525,6 +590,44 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
         subscriptionId = _subscriptionId;
         keyHash = _keyHash;
         callbackGasLimit = _callbackGasLimit;
+    }
+
+    /**
+     * @notice Set timeout for VRF responses (owner)
+     */
+    function setVRFResponseTimeout(uint256 _timeout) external onlyOwner {
+        vrfResponseTimeout = _timeout;
+    }
+
+    /**
+     * @notice Retry VRF request for a round if previous request appears stalled
+     * @dev Only owner can call; intended as emergency recovery
+     */
+    function retryDraw(uint256 roundId) external onlyOwner {
+        Round storage round = rounds[roundId];
+        if (round.finalized) revert AlreadyDrawn();
+
+        uint256 prevRequest = roundToVrfRequest[roundId];
+        require(prevRequest != 0, "No prior request");
+
+        // Only allow retry if previous request not fulfilled within timeout
+        require(vrfRequestRandomnessHash[prevRequest] == bytes32(0), "Already fulfilled");
+        require(block.timestamp >= vrfRequestTimestamp[prevRequest] + vrfResponseTimeout, "Not timed out");
+
+        // Request again
+        uint256 newRequestId = vrfCoordinator.requestRandomWords(
+            keyHash,
+            subscriptionId,
+            requestConfirmations,
+            callbackGasLimit,
+            numWords
+        );
+
+        vrfRequestToRound[newRequestId] = roundId;
+        roundToVrfRequest[roundId] = newRequestId;
+        vrfRequestTimestamp[newRequestId] = block.timestamp;
+
+        emit DrawRequested(roundId, newRequestId);
     }
 
     /**

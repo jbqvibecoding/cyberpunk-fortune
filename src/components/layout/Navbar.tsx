@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { Wallet, Menu, X, Zap } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 const Navbar = () => {
-  const [isConnected, setIsConnected] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const handleConnect = () => {
-    setIsConnected(!isConnected);
-  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -16,8 +12,7 @@ const Navbar = () => {
           {/* Logo */}
           <a href="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <Zap className="h-8 w-8 text-primary animate-pulse-glow" />
-              <div className="absolute inset-0 blur-lg bg-primary/30" />
+              <img src="/NewLogo.png" alt="Pioneer" className="h-10 w-10 rounded-md drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
             </div>
             <span className="font-display text-2xl font-bold tracking-wider text-glow-cyan">
               PIONEER
@@ -45,13 +40,11 @@ const Navbar = () => {
 
           {/* Wallet Button */}
           <div className="hidden md:block">
-            <button
-              onClick={handleConnect}
-              className={`cyber-btn ${isConnected ? 'cyber-btn-secondary' : 'cyber-btn-primary'} flex items-center gap-2`}
-            >
-              <Wallet className="h-4 w-4" />
-              {isConnected ? '0x1234...5678' : 'Connect Wallet'}
-            </button>
+            <ConnectButton
+              chainStatus="icon"
+              showBalance={true}
+              accountStatus="address"
+            />
           </div>
 
           {/* Mobile Menu Button */}
@@ -82,13 +75,13 @@ const Navbar = () => {
               <a href="#about" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors py-2">
                 ABOUT
               </a>
-              <button
-                onClick={handleConnect}
-                className={`cyber-btn ${isConnected ? 'cyber-btn-secondary' : 'cyber-btn-primary'} flex items-center justify-center gap-2 mt-2`}
-              >
-                <Wallet className="h-4 w-4" />
-                {isConnected ? '0x1234...5678' : 'Connect Wallet'}
-              </button>
+              <div className="mt-2">
+                <ConnectButton
+                  chainStatus="icon"
+                  showBalance={false}
+                  accountStatus="address"
+                />
+              </div>
             </div>
           </div>
         )}
