@@ -35,6 +35,9 @@ const Navbar = () => {
             <a href="#poker" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors">
               POKER
             </a>
+            <a href="#features" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors">
+              FEATURES
+            </a>
             <a href="#about" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors">
               ABOUT
             </a>
@@ -72,6 +75,9 @@ const Navbar = () => {
               </a>
               <a href="#poker" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors py-2">
                 POKER
+              </a>
+              <a href="#features" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors py-2">
+                FEATURES
               </a>
               <a href="#about" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors py-2">
                 ABOUT
