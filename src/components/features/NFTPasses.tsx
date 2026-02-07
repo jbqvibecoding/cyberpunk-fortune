@@ -1,5 +1,35 @@
-import { Gem, ShieldCheck, RefreshCw, TrendingUp, Eye, Lock, Repeat, Coins, ArrowRight } from 'lucide-react';
+import { Gem, ShieldCheck, RefreshCw, TrendingUp, Eye, Lock, Repeat, Coins, ArrowRight, Loader2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAccount, useWriteContract, useReadContract, usePublicClient } from 'wagmi';
+import { CONTRACTS, ZERO_ADDRESS } from '@/lib/contracts/addresses';
+import { GameNFTABI } from '@/lib/contracts/GameNFTABI';
+import { useState, useEffect, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { sepolia } from 'wagmi/chains';
+
+// ── localStorage helpers ─────────────────────────────────
+const NFT_STORAGE_KEY = 'pioneer_nft_owned';
+
+function getLocalNFTOwnership(address: string | undefined): { doublePlay: boolean; noLoss: boolean } {
+  if (!address) return { doublePlay: false, noLoss: false };
+  try {
+    const raw = localStorage.getItem(`${NFT_STORAGE_KEY}_${address.toLowerCase()}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { doublePlay: false, noLoss: false };
+}
+
+function setLocalNFTOwnership(address: string, type: 'doublePlay' | 'noLoss') {
+  const key = `${NFT_STORAGE_KEY}_${address.toLowerCase()}`;
+  const current = getLocalNFTOwnership(address);
+  current[type] = true;
+  localStorage.setItem(key, JSON.stringify(current));
+}
+
+function clearLocalNFTOwnership(address: string | undefined) {
+  if (!address) return;
+  localStorage.removeItem(`${NFT_STORAGE_KEY}_${address.toLowerCase()}`);
+}
 
 const nftPasses = [
   {
@@ -56,6 +86,139 @@ const nftPasses = [
 ];
 
 export default function NFTPasses() {
+  const { address, isConnected } = useAccount();
+  const isDeployed = CONTRACTS.GameNFT !== ZERO_ADDRESS;
+  const { writeContract, isPending } = useWriteContract();
+  const [mintingType, setMintingType] = useState<number | null>(null);
+  const { toast } = useToast();
+  const publicClient = usePublicClient({ chainId: sepolia.id });
+
+  // ── Local fallback state from localStorage ──
+  const [localOwned, setLocalOwned] = useState(() => getLocalNFTOwnership(address));
+
+  useEffect(() => {
+    setLocalOwned(getLocalNFTOwnership(address));
+  }, [address]);
+
+  // ── On-chain reads with explicit chainId ──
+  const { data: hasDoublePlay, refetch: refetchDoublePlay } = useReadContract({
+    address: CONTRACTS.GameNFT,
+    abi: GameNFTABI,
+    functionName: 'hasNFTType',
+    args: address ? [address, 0] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: isDeployed && !!address, refetchInterval: 5000 },
+  });
+
+  const { data: hasNoLoss, refetch: refetchNoLoss } = useReadContract({
+    address: CONTRACTS.GameNFT,
+    abi: GameNFTABI,
+    functionName: 'hasNFTType',
+    args: address ? [address, 1] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: isDeployed && !!address, refetchInterval: 5000 },
+  });
+
+  // ── Direct RPC read as additional fallback ──
+  const directReadNFT = useCallback(async () => {
+    if (!publicClient || !address || !isDeployed) return;
+    try {
+      const [dp, nl] = await Promise.all([
+        publicClient.readContract({
+          address: CONTRACTS.GameNFT,
+          abi: GameNFTABI,
+          functionName: 'hasNFTType',
+          args: [address, 0],
+        }),
+        publicClient.readContract({
+          address: CONTRACTS.GameNFT,
+          abi: GameNFTABI,
+          functionName: 'hasNFTType',
+          args: [address, 1],
+        }),
+      ]);
+      console.log('[NFT Direct Read]', { doublePlay: dp, noLoss: nl });
+      if (dp === true) {
+        setLocalOwned(prev => ({ ...prev, doublePlay: true }));
+        setLocalNFTOwnership(address, 'doublePlay');
+      }
+      if (nl === true) {
+        setLocalOwned(prev => ({ ...prev, noLoss: true }));
+        setLocalNFTOwnership(address, 'noLoss');
+      }
+    } catch (err) {
+      console.warn('[NFT Direct Read Error]', err);
+    }
+  }, [publicClient, address, isDeployed]);
+
+  // Try direct read on mount and periodically
+  useEffect(() => {
+    directReadNFT();
+    const interval = setInterval(directReadNFT, 8000);
+    return () => clearInterval(interval);
+  }, [directReadNFT]);
+
+  // ── Combined ownership: on-chain OR localStorage ──
+  const ownsDoublePlay = hasDoublePlay === true || localOwned.doublePlay;
+  const ownsNoLoss = hasNoLoss === true || localOwned.noLoss;
+
+  console.log('[NFT Debug]', {
+    hasDoublePlay, hasNoLoss, localOwned,
+    ownsDoublePlay, ownsNoLoss,
+    address, contractAddr: CONTRACTS.GameNFT,
+  });
+
+  const handleMint = (passType: number) => {
+    if (!isDeployed || !isConnected || !address) return;
+    const alreadyMinted = passType === 0 ? ownsDoublePlay : ownsNoLoss;
+    if (alreadyMinted) {
+      toast({ title: 'Already Minted', description: 'You already own this pass.', variant: 'destructive' });
+      return;
+    }
+    setMintingType(passType);
+    writeContract(
+      {
+        address: CONTRACTS.GameNFT,
+        abi: GameNFTABI,
+        functionName: 'mintPass',
+        args: [BigInt(passType)],
+        gas: BigInt(200_000),
+      },
+      {
+        onSuccess: () => {
+          toast({ title: 'Mint Successful!', description: 'Your NFT Pass has been minted.' });
+          // Immediately update local ownership
+          const typeKey = passType === 0 ? 'doublePlay' : 'noLoss';
+          setLocalNFTOwnership(address, typeKey as 'doublePlay' | 'noLoss');
+          setLocalOwned(prev => ({ ...prev, [typeKey]: true }));
+          // Also try to refetch on-chain data
+          setTimeout(() => {
+            refetchDoublePlay();
+            refetchNoLoss();
+            directReadNFT();
+          }, 3000);
+        },
+        onError: (error) => {
+          const msg = error?.message || '';
+          if (msg.includes('User rejected') || msg.includes('denied')) {
+            toast({ title: 'Cancelled', description: 'Transaction was rejected.' });
+          } else {
+            toast({ title: 'Mint Failed', description: 'Transaction failed. You may have already minted this pass.', variant: 'destructive' });
+          }
+        },
+        onSettled: () => setMintingType(null),
+      },
+    );
+  };
+
+  const handleReset = () => {
+    clearLocalNFTOwnership(address);
+    setLocalOwned({ doublePlay: false, noLoss: false });
+    refetchDoublePlay();
+    refetchNoLoss();
+    toast({ title: 'Reset Complete', description: 'Local NFT cache cleared. You can mint again after deploying a new contract.' });
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -68,6 +231,15 @@ export default function NFTPasses() {
           Unlock exclusive gameplay privileges with NFT-based passes. Each pass grants a unique advantage
           — from doubled draws to risk-free participation powered by DeFi yields.
         </p>
+        {/* Reset button for demo */}
+        {isConnected && (ownsDoublePlay || ownsNoLoss) && (
+          <button
+            onClick={handleReset}
+            className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-xs font-mono hover:bg-destructive/20 transition-all"
+          >
+            <Trash2 className="h-3 w-3" /> RESET DEMO (Clear Local Cache)
+          </button>
+        )}
       </div>
 
       {/* NFT Cards */}
@@ -114,6 +286,54 @@ export default function NFTPasses() {
                   </li>
                 ))}
               </ol>
+            </div>
+
+            {/* Mint Button */}
+            <div className="border-t border-border pt-4 mt-4">
+              {(() => {
+                const passType = pass.id === 'double-play' ? 0 : 1;
+                const alreadyHas = passType === 0 ? ownsDoublePlay : ownsNoLoss;
+                const isMinting = mintingType === passType && isPending;
+
+                if (!isConnected) {
+                  return (
+                    <div className="text-center text-xs text-muted-foreground font-mono py-2">
+                      CONNECT WALLET TO MINT
+                    </div>
+                  );
+                }
+                if (!isDeployed) {
+                  return (
+                    <div className="text-center text-xs text-muted-foreground font-mono py-2">
+                      CONTRACT NOT DEPLOYED
+                    </div>
+                  );
+                }
+                if (alreadyHas) {
+                  return (
+                    <div className="text-center text-xs text-success font-mono py-2 flex items-center justify-center gap-2">
+                      <ShieldCheck className="h-4 w-4" /> OWNED
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => handleMint(passType)}
+                    disabled={isMinting}
+                    className={cn(
+                      'w-full py-3 rounded-lg font-display text-sm tracking-wide transition-all flex items-center justify-center gap-2',
+                      pass.bgColor, pass.borderColor, 'border hover:opacity-80',
+                      isMinting && 'opacity-50 cursor-not-allowed',
+                    )}
+                  >
+                    {isMinting ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> MINTING...</>
+                    ) : (
+                      <>MINT {pass.name} (FREE)</>
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         ))}

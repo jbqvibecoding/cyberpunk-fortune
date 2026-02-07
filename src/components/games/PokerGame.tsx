@@ -30,7 +30,7 @@ export default function PokerGame() {
   // This hook MUST be called unconditionally - never inside conditions
   const { state, actions } = usePokerGame(buyIn);
   const { isConnected } = useAccount();
-  const isOnChain = isConnected && CONTRACTS.TexasHoldem !== '0x0000000000000000000000000000000000000000';
+  const isOnChain = isConnected && CONTRACTS.SimplePoker !== '0x0000000000000000000000000000000000000000';
 
   // Track hand results - useEffect at top level, conditional logic inside
   useEffect(() => {

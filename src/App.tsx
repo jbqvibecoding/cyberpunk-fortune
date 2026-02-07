@@ -16,6 +16,7 @@ const App = () => (
   <WagmiProvider config={config}>
     <QueryClientProvider client={queryClient}>
       <RainbowKitProvider
+        locale="en"
         theme={darkTheme({
           accentColor: '#00f0ff',
           accentColorForeground: '#0a0a0f',

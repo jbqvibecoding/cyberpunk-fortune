@@ -21,7 +21,7 @@ const HeroSection = () => {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 bg-primary/5 mb-8 animate-fade-in">
             <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            <span className="font-mono text-sm text-primary">ETHEREUM MAINNET • LIVE</span>
+            <span className="font-mono text-sm text-primary">SEPOLIA TESTNET • LIVE</span>
           </div>
 
           {/* Main Title */}

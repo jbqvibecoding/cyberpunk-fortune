@@ -1,5 +1,9 @@
 import { Globe, User, BadgeCheck, Link2, Search, Fingerprint, Shield, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { mainnet } from 'wagmi/chains';
+import { normalize } from 'viem/ens';
 
 const examplePlayers = [
   { ens: 'cryptowhale.eth', avatar: '🐋', chips: '12,450', status: 'online', color: 'text-primary' },
@@ -36,6 +40,10 @@ const integrationFeatures = [
 ];
 
 export default function ENSIntegration() {
+  const { address, isConnected } = useAccount();
+  const { data: ensName } = useEnsName({ address, chainId: mainnet.id });
+  const { data: ensAvatar } = useEnsAvatar({ name: ensName ? normalize(ensName) : undefined, chainId: mainnet.id });
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -49,6 +57,41 @@ export default function ENSIntegration() {
           with human-readable names, verified avatars, and cross-platform reputation.
         </p>
       </div>
+
+      {/* Live ENS Resolution for Connected Wallet */}
+      {isConnected && address && (
+        <div className="cyber-card p-6 border-2 border-primary/50 glow-cyan">
+          <h4 className="font-display text-sm mb-4 tracking-wide text-primary">YOUR ENS IDENTITY (LIVE)</h4>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center text-2xl border-2 border-primary/50 overflow-hidden">
+              {ensAvatar ? (
+                <img src={ensAvatar} alt="ENS Avatar" className="w-full h-full object-cover" />
+              ) : (
+                '👤'
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-display text-lg font-bold text-primary">
+                  {ensName || `${address.slice(0, 6)}...${address.slice(-4)}`}
+                </span>
+                {ensName && <BadgeCheck className="h-4 w-4 text-success" />}
+              </div>
+              <span className="font-mono text-xs text-muted-foreground">
+                {ensName ? `Resolved from ${address.slice(0, 6)}...${address.slice(-4)}` : 'No ENS name found for this wallet'}
+              </span>
+            </div>
+            <div className="ml-auto">
+              <span className={cn(
+                'font-mono text-xs px-2 py-1 rounded',
+                ensName ? 'bg-success/20 text-success' : 'bg-muted/50 text-muted-foreground',
+              )}>
+                {ensName ? 'RESOLVED' : 'NO ENS'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Player List Preview */}
       <div className="cyber-card p-6">

@@ -1,6 +1,9 @@
-import { Gift, Users, Vote, Share2, Coins, ArrowRight, Copy, ChevronRight, TrendingUp, Shield } from 'lucide-react';
+import { Gift, Users, Vote, Share2, Coins, ArrowRight, Copy, ChevronRight, TrendingUp, Shield, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useAccount, useWriteContract, useReadContract } from 'wagmi';
+import { CONTRACTS, ZERO_ADDRESS } from '@/lib/contracts/addresses';
+import { GameReferralABI } from '@/lib/contracts/GameReferralABI';
 
 const tiers = [
   { level: 'BRONZE', referrals: '1-5', reward: '500 $PIONEER', color: 'text-accent' },
@@ -38,8 +41,50 @@ const benefits = [
 
 export default function ReferralSystem() {
   const [copied, setCopied] = useState(false);
+  const [referralInput, setReferralInput] = useState('');
+  const { address, isConnected } = useAccount();
+  const isDeployed = CONTRACTS.GameReferral !== ZERO_ADDRESS;
+  const { writeContract, isPending } = useWriteContract();
+
+  const { data: isRegistered } = useReadContract({
+    address: CONTRACTS.GameReferral,
+    abi: GameReferralABI,
+    functionName: 'isReferrer',
+    args: address ? [address] : undefined,
+    query: { enabled: isDeployed && !!address },
+  });
+
+  const { data: referrerInfo } = useReadContract({
+    address: CONTRACTS.GameReferral,
+    abi: GameReferralABI,
+    functionName: 'getReferrerInfo',
+    args: address ? [address] : undefined,
+    query: { enabled: isDeployed && !!address && !!isRegistered },
+  });
+
+  const handleRegister = () => {
+    if (!isDeployed || !isConnected) return;
+    writeContract({
+      address: CONTRACTS.GameReferral,
+      abi: GameReferralABI,
+      functionName: 'registerAsReferrer',
+    });
+  };
+
+  const handleJoinWithReferral = () => {
+    if (!isDeployed || !isConnected || !referralInput) return;
+    writeContract({
+      address: CONTRACTS.GameReferral,
+      abi: GameReferralABI,
+      functionName: 'registerWithReferral',
+      args: [referralInput as `0x${string}`],
+    });
+  };
 
   const handleCopy = () => {
+    if (address) {
+      navigator.clipboard.writeText(`https://pioneer.game/ref/${address}`);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -63,10 +108,11 @@ export default function ReferralSystem() {
         <h4 className="font-display text-sm mb-4 text-muted-foreground tracking-wide">YOUR REFERRAL LINK</h4>
         <div className="flex items-center gap-3">
           <div className="flex-1 bg-muted/30 rounded-lg px-4 py-3 font-mono text-sm text-muted-foreground truncate border border-border">
-            https://pioneer.game/ref/0x1a2B...3c4D
+            {address ? `https://pioneer.game/ref/${address.slice(0, 6)}...${address.slice(-4)}` : 'Connect wallet to generate link'}
           </div>
           <button
             onClick={handleCopy}
+            disabled={!address}
             className={cn(
               'cyber-btn-primary px-4 py-3 flex items-center gap-2 text-sm',
               copied && 'bg-success text-success-foreground'
@@ -76,6 +122,51 @@ export default function ReferralSystem() {
             {copied ? 'COPIED!' : 'COPY'}
           </button>
         </div>
+
+        {/* On-chain registration */}
+        {isDeployed && isConnected && (
+          <div className="mt-4 pt-4 border-t border-border space-y-3">
+            {isRegistered ? (
+              <div className="flex items-center gap-2 text-success font-mono text-sm">
+                <Shield className="h-4 w-4" />
+                REGISTERED AS REFERRER
+                {referrerInfo && (
+                  <span className="text-muted-foreground ml-2">
+                    | Referrals: {(referrerInfo as any)[1]?.toString() ?? '0'} | Points: {(referrerInfo as any)[2]?.toString() ?? '0'}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={handleRegister}
+                disabled={isPending}
+                className="cyber-btn-primary w-full py-3 flex items-center justify-center gap-2 text-sm"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
+                {isPending ? 'REGISTERING...' : 'REGISTER AS REFERRER (ON-CHAIN)'}
+              </button>
+            )}
+
+            {/* Join with referral */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Enter referrer address (0x...)"
+                value={referralInput}
+                onChange={e => setReferralInput(e.target.value)}
+                className="flex-1 bg-muted/30 rounded-lg px-4 py-2 font-mono text-sm border border-border text-foreground placeholder:text-muted-foreground"
+              />
+              <button
+                onClick={handleJoinWithReferral}
+                disabled={isPending || !referralInput}
+                className="cyber-btn px-4 py-2 text-sm bg-muted hover:bg-muted/80"
+              >
+                JOIN
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-4 mt-4">
           <span className="text-xs text-muted-foreground">Share via:</span>
           {['Twitter / X', 'Discord', 'Telegram'].map((platform) => (

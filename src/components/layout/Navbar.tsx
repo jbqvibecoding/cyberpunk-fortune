@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Zap } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 const Navbar = () => {
@@ -12,7 +12,8 @@ const Navbar = () => {
           {/* Logo */}
           <a href="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <img src="/NewLogo.png" alt="Pioneer" className="h-10 w-10 rounded-md drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+              <Zap className="h-8 w-8 text-primary" />
+              <div className="absolute inset-0 blur-lg bg-primary/30" />
             </div>
             <span className="font-display text-2xl font-bold tracking-wider text-glow-cyan">
               PIONEER

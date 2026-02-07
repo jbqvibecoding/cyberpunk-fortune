@@ -5,24 +5,11 @@ import { GameState, GameActions, Player, Card, PlayerAction, GamePhase } from '@
 import { createDeck, shuffleDeck, dealCards } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/handEvaluator';
 import { getAIDecision, getAICommentary } from '@/lib/poker/aiPlayer';
-import { CONTRACTS } from '@/lib/contracts/addresses';
-import { TexasHoldemABI } from '@/lib/contracts/TexasHoldemABI';
+import { CONTRACTS, ZERO_ADDRESS } from '@/lib/contracts/addresses';
+import { SimplePokerABI } from '@/lib/contracts/SimplePokerABI';
 
 const SMALL_BLIND = 5;
 const BIG_BLIND = 10;
-
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
-
-// ── Map contract phase uint8 to frontend GamePhase ─────────
-const CONTRACT_PHASE_MAP: Record<number, GamePhase> = {
-  0: 'waiting',
-  1: 'pre-flop',
-  2: 'flop',
-  3: 'turn',
-  4: 'river',
-  5: 'showdown',
-  6: 'finished',
-};
 
 function createInitialState(buyIn: number): GameState {
   return {
@@ -78,39 +65,31 @@ function createInitialState(buyIn: number): GameState {
 
 export function usePokerGame(buyIn: number = 1000): { state: GameState; actions: GameActions } {
   const { address, isConnected } = useAccount();
-  const isContractDeployed = CONTRACTS.TexasHoldem !== ZERO_ADDRESS;
+  const isContractDeployed = CONTRACTS.SimplePoker !== ZERO_ADDRESS;
   const isOnChain = isConnected && isContractDeployed;
 
   // ── Contract reads ──────────────────────────────────────────
 
-  const { data: activeGameId, refetch: refetchActiveGame } = useReadContract({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
-    functionName: 'activeGame',
+  const { data: playerStats, refetch: refetchStats } = useReadContract({
+    address: CONTRACTS.SimplePoker,
+    abi: SimplePokerABI,
+    functionName: 'getPlayerStats',
     args: address ? [address] : undefined,
     query: { enabled: isOnChain && !!address },
   });
 
-  const { data: minBuyIn } = useReadContract({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
+  const { data: minBuyInRaw } = useReadContract({
+    address: CONTRACTS.SimplePoker,
+    abi: SimplePokerABI,
     functionName: 'minBuyIn',
     query: { enabled: isOnChain },
   });
 
-  const { data: maxBuyIn } = useReadContract({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
+  const { data: maxBuyInRaw } = useReadContract({
+    address: CONTRACTS.SimplePoker,
+    abi: SimplePokerABI,
     functionName: 'maxBuyIn',
     query: { enabled: isOnChain },
-  });
-
-  const { data: gameData, refetch: refetchGameData } = useReadContract({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
-    functionName: 'games',
-    args: activeGameId ? [activeGameId as bigint] : undefined,
-    query: { enabled: isOnChain && !!activeGameId && (activeGameId as bigint) > 0n },
   });
 
   // ── Contract write ──────────────────────────────────────────
@@ -124,70 +103,24 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
   // ── Contract events ─────────────────────────────────────────
 
   useWatchContractEvent({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
-    eventName: 'GameCreated',
-    enabled: isOnChain,
-    onLogs(logs) {
-      for (const log of logs) {
-        const args = (log as any).args;
-        if (args?.player?.toLowerCase() === address?.toLowerCase()) {
-          refetchActiveGame();
-          refetchGameData();
-        }
-      }
-    },
-  });
-
-  useWatchContractEvent({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
-    eventName: 'AIActed',
+    address: CONTRACTS.SimplePoker,
+    abi: SimplePokerABI,
+    eventName: 'GameResult',
     enabled: isOnChain,
     onLogs(logs) {
       for (const log of logs) {
         const args = (log as any).args;
         if (!args) continue;
-        const actionMap = ['fold', 'check', 'call', 'raise', 'all-in'] as const;
-        const aiAction = actionMap[Number(args.action)] ?? 'check';
-        const reasoning = args.reasoning ?? '';
+        // Show on-chain result in AI commentary
+        const won = args.playerWon;
+        const desc = args.handDescription ?? '';
+        const payout = args.payout ? formatEther(args.payout as bigint) : '0';
         setState(prev => ({
           ...prev,
-          aiCommentary: `AI ${aiAction}${reasoning ? `: ${reasoning}` : ''}`,
-          aiThinking: false,
+          aiCommentary: `On-chain result: ${won ? 'YOU WIN' : 'AI WINS'} - ${desc} (Payout: ${payout} ETH)`,
         }));
-        refetchGameData();
+        refetchStats();
       }
-    },
-  });
-
-  useWatchContractEvent({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
-    eventName: 'HandCompleted',
-    enabled: isOnChain,
-    onLogs(logs) {
-      for (const log of logs) {
-        const args = (log as any).args;
-        if (!args) continue;
-        setState(prev => ({
-          ...prev,
-          phase: 'finished',
-          aiCommentary: args.handDescription ?? (args.playerWon ? 'You win!' : 'AI wins!'),
-        }));
-        refetchGameData();
-      }
-    },
-  });
-
-  useWatchContractEvent({
-    address: CONTRACTS.TexasHoldem as `0x${string}`,
-    abi: TexasHoldemABI,
-    eventName: 'GameEnded',
-    enabled: isOnChain,
-    onLogs() {
-      refetchActiveGame();
-      refetchGameData();
     },
   });
 
@@ -201,28 +134,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     initialBuyInRef.current = buyIn;
   }, [buyIn]);
 
-  // Sync on-chain game data into local state when available
-  useEffect(() => {
-    if (!isOnChain || !gameData) return;
-    const data = gameData as any;
-    const contractPhase = Number(data[7] ?? data.phase ?? 0);
-    const onChainPhase = CONTRACT_PHASE_MAP[contractPhase] ?? 'waiting';
-
-    if (onChainPhase !== 'waiting') {
-      setState(prev => ({
-        ...prev,
-        pot: Number(formatEther((data[3] ?? data.pot ?? 0n) as bigint)) * 1000, // rough conversion
-        currentBet: Number(formatEther((data[4] ?? data.currentBet ?? 0n) as bigint)) * 1000,
-        players: prev.players.map((p, i) =>
-          i === 0
-            ? { ...p, chips: Number(formatEther((data[1] ?? data.playerChips ?? 0n) as bigint)) * 1000 }
-            : { ...p, chips: Number(formatEther((data[2] ?? data.aiChips ?? 0n) as bigint)) * 1000 },
-        ),
-      }));
-    }
-  }, [isOnChain, gameData]);
-
-  // ── Game logic helpers (unchanged) ──────────────────────────
+  // ── Game logic helpers ──────────────────────────────────────
 
   const getNextActivePlayerIndex = useCallback(
     (players: Player[], currentIndex: number): number => {
@@ -237,7 +149,6 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
   const advanceToNextPhase = useCallback((prevState: GameState): GameState => {
     const phases: GamePhase[] = ['pre-flop', 'flop', 'turn', 'river', 'showdown'];
     const currentPhaseIndex = phases.indexOf(prevState.phase as GamePhase);
-
     if (currentPhaseIndex === -1 || currentPhaseIndex >= phases.length - 1) return prevState;
 
     const nextPhase = phases[currentPhaseIndex + 1];
@@ -261,8 +172,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     }));
 
     const firstToAct = resetPlayers.findIndex(p => !p.isDealer && !p.hasFolded && !p.isAllIn);
-    const actualFirst =
-      firstToAct >= 0 ? firstToAct : resetPlayers.findIndex(p => !p.hasFolded && !p.isAllIn);
+    const actualFirst = firstToAct >= 0 ? firstToAct : resetPlayers.findIndex(p => !p.hasFolded && !p.isAllIn);
 
     return {
       ...prevState,
@@ -319,7 +229,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     };
   }, []);
 
-  // ── Process action (shared) ─────────────────────────────────
+  // ── Process action ──────────────────────────────────────────
 
   const processAction = useCallback(
     (action: PlayerAction, amount?: number, commentary?: string) => {
@@ -338,17 +248,12 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
           case 'fold':
             updatedPlayers[playerIndex] = { ...currentPlayer, hasFolded: true, hasActed: true };
             break;
-
           case 'check':
             if (prev.currentBet > currentPlayer.currentBet) return prev;
             updatedPlayers[playerIndex] = { ...currentPlayer, hasActed: true };
             break;
-
           case 'call': {
-            const callAmt = Math.min(
-              prev.currentBet - currentPlayer.currentBet,
-              currentPlayer.chips,
-            );
+            const callAmt = Math.min(prev.currentBet - currentPlayer.currentBet, currentPlayer.chips);
             updatedPlayers[playerIndex] = {
               ...currentPlayer,
               chips: currentPlayer.chips - callAmt,
@@ -360,7 +265,6 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
             newPot += callAmt;
             break;
           }
-
           case 'raise': {
             const raiseTotal = amount || prev.bigBlind * 2;
             const toAdd = Math.min(raiseTotal, currentPlayer.chips);
@@ -374,14 +278,12 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
             };
             newPot += toAdd;
             newCurrentBet = updatedPlayers[playerIndex].currentBet;
-
             const otherIdx = (playerIndex + 1) % 2;
             if (!updatedPlayers[otherIdx].hasFolded && !updatedPlayers[otherIdx].isAllIn) {
               updatedPlayers[otherIdx].hasActed = false;
             }
             break;
           }
-
           case 'all-in': {
             const allInAmt = currentPlayer.chips;
             updatedPlayers[playerIndex] = {
@@ -393,7 +295,6 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
               isAllIn: true,
             };
             newPot += allInAmt;
-
             if (updatedPlayers[playerIndex].currentBet > newCurrentBet) {
               newCurrentBet = updatedPlayers[playerIndex].currentBet;
               const otherIndex = (playerIndex + 1) % 2;
@@ -411,31 +312,19 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
           pot: newPot,
           currentBet: newCurrentBet,
           lastAction: { player: currentPlayer.name, action, amount },
-          aiCommentary: currentPlayer.isAI
-            ? commentary || getAICommentary(action)
-            : prev.aiCommentary,
+          aiCommentary: currentPlayer.isAI ? commentary || getAICommentary(action) : prev.aiCommentary,
         };
 
-        // Someone folded
         if (updatedPlayers.some(p => p.hasFolded)) return determineWinner(newState);
 
-        // Round-complete checks
         const activePlayers = updatedPlayers.filter(p => !p.hasFolded && !p.isAllIn);
         const allActed = activePlayers.every(p => p.hasActed);
-        const betsEqual =
-          activePlayers.every(p => p.currentBet === newCurrentBet) || activePlayers.length === 0;
+        const betsEqual = activePlayers.every(p => p.currentBet === newCurrentBet) || activePlayers.length === 0;
         const allAllIn = updatedPlayers.filter(p => !p.hasFolded).every(p => p.isAllIn);
 
-        if (
-          allAllIn ||
-          (activePlayers.length <= 1 && updatedPlayers.filter(p => !p.hasFolded).length > 1)
-        ) {
+        if (allAllIn || (activePlayers.length <= 1 && updatedPlayers.filter(p => !p.hasFolded).length > 1)) {
           let runOut: GameState = newState;
-          while (
-            runOut.phase !== 'river' &&
-            runOut.phase !== 'showdown' &&
-            runOut.phase !== 'finished'
-          ) {
+          while (runOut.phase !== 'river' && runOut.phase !== 'showdown' && runOut.phase !== 'finished') {
             runOut = advanceToNextPhase(runOut);
           }
           if (runOut.phase === 'river') return determineWinner(runOut);
@@ -456,9 +345,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
   // ── AI turn effect ──────────────────────────────────────────
 
   useEffect(() => {
-    if (state.phase === 'waiting' || state.phase === 'finished' || state.phase === 'showdown')
-      return;
-
+    if (state.phase === 'waiting' || state.phase === 'finished' || state.phase === 'showdown') return;
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.isAI || currentPlayer.hasFolded || currentPlayer.isAllIn) return;
     if (aiThinkingRef.current) return;
@@ -493,17 +380,15 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
   // ── Actions ─────────────────────────────────────────────────
 
   const startGame = useCallback(() => {
-    // ▸▸ ON-CHAIN: call contract.startGame{value: buyIn}
+    // ON-CHAIN: call quickPlay for instant result recording
     if (isOnChain) {
-      const buyInWei = parseEther('0.01'); // default buy-in
+      const buyInWei = parseEther('0.001');
       writeContract({
-        address: CONTRACTS.TexasHoldem as `0x${string}`,
-        abi: TexasHoldemABI,
-        functionName: 'startGame',
+        address: CONTRACTS.SimplePoker,
+        abi: SimplePokerABI,
+        functionName: 'quickPlay',
         value: buyInWei,
       });
-      // After tx confirms, the contract events will drive the game
-      // We still start local simulation for immediate UX feedback
     }
 
     // Local simulation (always runs for UX)
@@ -563,83 +448,40 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
   const fold = useCallback(() => {
     const current = state.players[state.currentPlayerIndex];
     if (!current || current.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
-
-    if (isOnChain) {
-      writeContract({
-        address: CONTRACTS.TexasHoldem as `0x${string}`,
-        abi: TexasHoldemABI,
-        functionName: 'fold',
-      });
-    }
     processAction('fold');
-  }, [state.players, state.currentPlayerIndex, state.phase, processAction, isOnChain, writeContract]);
+  }, [state.players, state.currentPlayerIndex, state.phase, processAction]);
 
   const check = useCallback(() => {
     const current = state.players[state.currentPlayerIndex];
     if (!current || current.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
     if (state.currentBet > current.currentBet) return;
-
-    if (isOnChain) {
-      writeContract({
-        address: CONTRACTS.TexasHoldem as `0x${string}`,
-        abi: TexasHoldemABI,
-        functionName: 'check',
-      });
-    }
     processAction('check');
-  }, [state.players, state.currentPlayerIndex, state.phase, state.currentBet, processAction, isOnChain, writeContract]);
+  }, [state.players, state.currentPlayerIndex, state.phase, state.currentBet, processAction]);
 
   const call = useCallback(() => {
     const current = state.players[state.currentPlayerIndex];
     if (!current || current.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
-
-    if (isOnChain) {
-      writeContract({
-        address: CONTRACTS.TexasHoldem as `0x${string}`,
-        abi: TexasHoldemABI,
-        functionName: 'call',
-      });
-    }
     processAction('call');
-  }, [state.players, state.currentPlayerIndex, state.phase, processAction, isOnChain, writeContract]);
+  }, [state.players, state.currentPlayerIndex, state.phase, processAction]);
 
   const raise = useCallback(
     (amount: number) => {
       const current = state.players[state.currentPlayerIndex];
-      if (!current || current.isAI || state.phase === 'waiting' || state.phase === 'finished')
-        return;
-
-      if (isOnChain) {
-        writeContract({
-          address: CONTRACTS.TexasHoldem as `0x${string}`,
-          abi: TexasHoldemABI,
-          functionName: 'raise',
-          args: [BigInt(amount)],
-        });
-      }
+      if (!current || current.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
       processAction('raise', amount);
     },
-    [state.players, state.currentPlayerIndex, state.phase, processAction, isOnChain, writeContract],
+    [state.players, state.currentPlayerIndex, state.phase, processAction],
   );
 
   const allIn = useCallback(() => {
     const current = state.players[state.currentPlayerIndex];
     if (!current || current.isAI || state.phase === 'waiting' || state.phase === 'finished') return;
-
-    if (isOnChain) {
-      writeContract({
-        address: CONTRACTS.TexasHoldem as `0x${string}`,
-        abi: TexasHoldemABI,
-        functionName: 'allIn',
-      });
-    }
     processAction('all-in');
-  }, [state.players, state.currentPlayerIndex, state.phase, processAction, isOnChain, writeContract]);
+  }, [state.players, state.currentPlayerIndex, state.phase, processAction]);
 
   const resetGame = useCallback(() => {
     setState(prev => {
       const newDealerIndex = (prev.dealerIndex + 1) % 2;
-
       const playerChips = prev.players.map((p) => {
         let chips = p.chips;
         if (prev.isTie && prev.tiedPlayers) {
@@ -662,17 +504,6 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
       };
     });
   }, []);
-
-  // ── Cash-out (on-chain only) ────────────────────────────────
-
-  const cashOut = useCallback(() => {
-    if (!isOnChain) return;
-    writeContract({
-      address: CONTRACTS.TexasHoldem as `0x${string}`,
-      abi: TexasHoldemABI,
-      functionName: 'cashOut',
-    });
-  }, [isOnChain, writeContract]);
 
   return {
     state,

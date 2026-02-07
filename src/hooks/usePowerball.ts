@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWatchContractEvent } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
-import { CONTRACTS } from '@/lib/contracts/addresses';
-import { CyberPowerballABI } from '@/lib/contracts/CyberPowerballABI';
+import { CONTRACTS, ZERO_ADDRESS } from '@/lib/contracts/addresses';
+import { SimpleLotteryABI } from '@/lib/contracts/SimpleLotteryABI';
+import { GameNFTABI } from '@/lib/contracts/GameNFTABI';
+import { sepolia } from 'wagmi/chains';
 
 // ════════════════════════════════════════════════════════════════
-// Types  (preserved from original – consumed by PowerballGame.tsx)
+// Types (consumed by PowerballGame.tsx)
 // ════════════════════════════════════════════════════════════════
 
 export type PlayMode = 'standard' | 'double-play' | 'no-loss';
@@ -47,12 +49,11 @@ export interface PowerballState {
   hasDoublePlayNFT: boolean;
   hasNoLossNFT: boolean;
   noLossPool: number;
-  /** true while an on-chain buyTicket tx is pending */
   isBuyingOnChain: boolean;
-  /** tx hash of the latest on-chain purchase */
   txHash: string | null;
-  /** whether we're operating against the deployed contract */
   onChainMode: boolean;
+  randomnessProof: string | null;
+  vrfPending: boolean;
 }
 
 const PRIZE_TIERS = [
@@ -67,51 +68,63 @@ const PRIZE_TIERS = [
   { numbers: 0, powerball: true,  multiplier: 4,         label: 'POWERBALL ONLY' },
 ];
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
-
 // ════════════════════════════════════════════════════════════════
 // Hook
 // ════════════════════════════════════════════════════════════════
 
 export function usePowerball() {
   const { address, isConnected } = useAccount();
-  const isContractDeployed = CONTRACTS.CyberPowerball !== ZERO_ADDRESS;
+  const isContractDeployed = CONTRACTS.SimpleLottery !== ZERO_ADDRESS;
   const isOnChain = isConnected && isContractDeployed;
 
-  // ── Contract reads (enabled only when on-chain) ─────────────
+  // ── Contract reads ──────────────────────────────────────────
 
   const { data: currentRoundId, refetch: refetchRound } = useReadContract({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     functionName: 'currentRoundId',
     query: { enabled: isOnChain },
   });
 
   const { data: ticketPriceRaw } = useReadContract({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     functionName: 'ticketPrice',
     query: { enabled: isOnChain },
   });
 
   const { data: nextDrawTimeRaw } = useReadContract({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     functionName: 'nextDrawTime',
     query: { enabled: isOnChain },
   });
 
+  const { data: totalTicketsRaw } = useReadContract({
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
+    functionName: 'totalTickets',
+    query: { enabled: isOnChain },
+  });
+
+  const { data: vrfPendingRaw } = useReadContract({
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
+    functionName: 'vrfPending',
+    query: { enabled: isOnChain },
+  });
+
   const { data: roundInfo, refetch: refetchRoundInfo } = useReadContract({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     functionName: 'getRoundInfo',
     args: currentRoundId !== undefined ? [currentRoundId as bigint] : undefined,
     query: { enabled: isOnChain && currentRoundId !== undefined },
   });
 
   const { data: playerTicketIds, refetch: refetchPlayerTickets } = useReadContract({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     functionName: 'getPlayerTickets',
     args:
       currentRoundId !== undefined && address
@@ -119,6 +132,38 @@ export function usePowerball() {
         : undefined,
     query: { enabled: isOnChain && currentRoundId !== undefined && !!address },
   });
+
+  // ── NFT Pass ownership checks ───────────────────────────────
+
+  const isNFTDeployed = CONTRACTS.GameNFT !== ZERO_ADDRESS;
+
+  const { data: hasDoublePlayNFT } = useReadContract({
+    address: CONTRACTS.GameNFT,
+    abi: GameNFTABI,
+    functionName: 'hasNFTType',
+    args: address ? [address, 0] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: isNFTDeployed && !!address, refetchInterval: 5000 },
+  });
+
+  const { data: hasNoLossNFT } = useReadContract({
+    address: CONTRACTS.GameNFT,
+    abi: GameNFTABI,
+    functionName: 'hasNFTType',
+    args: address ? [address, 1] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: isNFTDeployed && !!address, refetchInterval: 5000 },
+  });
+
+  // localStorage fallback for NFT ownership
+  const localNFT = useMemo(() => {
+    if (!address) return { doublePlay: false, noLoss: false };
+    try {
+      const raw = localStorage.getItem(`pioneer_nft_owned_${address.toLowerCase()}`);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return { doublePlay: false, noLoss: false };
+  }, [address]);
 
   // ── Contract write ──────────────────────────────────────────
 
@@ -132,19 +177,54 @@ export function usePowerball() {
   // ── Contract events ─────────────────────────────────────────
 
   useWatchContractEvent({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     eventName: 'TicketPurchased',
     enabled: isOnChain,
-    onLogs() {
+    onLogs(logs) {
+      for (const log of logs) {
+        const args = (log as any).args;
+        if (!args) continue;
+        // Only add own tickets to local state
+        if (args.player?.toLowerCase() !== address?.toLowerCase()) continue;
+
+        const mainNumbers = Array.from(args.mainNumbers as number[]).map(Number);
+        const powerball = Number(args.powerball);
+        const ticketId = args.ticketId !== undefined ? Number(args.ticketId) : Date.now();
+
+        const newTicket: PowerballTicket = {
+          id: `ticket-${ticketId}`,
+          numbers: mainNumbers,
+          powerball,
+          timestamp: new Date(),
+          cost: 0.001,
+          matchedNumbers: 0,
+          matchedPowerball: false,
+          prize: 0,
+          playMode: 'standard',
+          drawRound: args.roundId !== undefined ? Number(args.roundId) : 1,
+          principalRedeemable: false,
+        };
+
+        setState(prev => {
+          // Avoid duplicates
+          if (prev.tickets.some(t => t.id === newTicket.id)) return prev;
+          return {
+            ...prev,
+            tickets: [newTicket, ...prev.tickets],
+            totalTicketsSold: prev.totalTicketsSold + 1,
+            currentJackpot: prev.currentJackpot + 0.001 * 0.98 * 0.5,
+          };
+        });
+      }
       refetchPlayerTickets();
       refetchRoundInfo();
     },
   });
 
   useWatchContractEvent({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     eventName: 'DrawCompleted',
     enabled: isOnChain,
     onLogs(logs) {
@@ -167,7 +247,7 @@ export function usePowerball() {
             isDrawing: false,
             lastDraw: newDraw,
             drawHistory: [newDraw, ...prev.drawHistory].slice(0, 10),
-            countdown: { hours: 23, minutes: 59, seconds: 59 },
+            countdown: { hours: 0, minutes: 5, seconds: 0 },
           };
         });
       }
@@ -178,8 +258,25 @@ export function usePowerball() {
   });
 
   useWatchContractEvent({
-    address: CONTRACTS.CyberPowerball as `0x${string}`,
-    abi: CyberPowerballABI,
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
+    eventName: 'RandomnessRevealed',
+    enabled: isOnChain,
+    onLogs(logs) {
+      for (const log of logs) {
+        const args = (log as any).args;
+        if (!args) continue;
+        setState(prev => ({
+          ...prev,
+          randomnessProof: args.randomnessProof as string,
+        }));
+      }
+    },
+  });
+
+  useWatchContractEvent({
+    address: CONTRACTS.SimpleLottery,
+    abi: SimpleLotteryABI,
     eventName: 'PrizeClaimed',
     enabled: isOnChain,
     onLogs() {
@@ -197,32 +294,43 @@ export function usePowerball() {
   }, [roundInfo]);
 
   const onChainTicketCount = useMemo(() => {
+    if (totalTicketsRaw !== undefined) return Number(totalTicketsRaw);
     if (!roundInfo) return undefined;
     const info = roundInfo as any;
     const count = info[5] ?? info.ticketCount;
     return count !== undefined ? Number(count) : undefined;
+  }, [roundInfo, totalTicketsRaw]);
+
+  const onChainRandomnessProof = useMemo(() => {
+    if (!roundInfo) return null;
+    const info = roundInfo as any;
+    const proof = info[9] ?? info.randomnessProof;
+    if (!proof || proof === '0x0000000000000000000000000000000000000000000000000000000000000000') return null;
+    return proof as string;
   }, [roundInfo]);
 
-  // ── Local state (UI + simulation fallback) ──────────────────
+  // ── Local state ─────────────────────────────────────────────
 
   const [state, setState] = useState<PowerballState>({
     selectedNumbers: [],
     powerball: null,
     ticketCount: 1,
     tickets: [],
-    currentJackpot: 247.85,
+    currentJackpot: 0,
     lastDraw: null,
     drawHistory: [],
     isDrawing: false,
-    countdown: { hours: 12, minutes: 34, seconds: 56 },
-    totalTicketsSold: 4892,
+    countdown: { hours: 0, minutes: 5, seconds: 0 },
+    totalTicketsSold: 0,
     playMode: 'standard',
-    hasDoublePlayNFT: true,
-    hasNoLossNFT: true,
-    noLossPool: 3.42,
+    hasDoublePlayNFT: false,
+    hasNoLossNFT: false,
+    noLossPool: 0,
     isBuyingOnChain: false,
     txHash: null,
     onChainMode: false,
+    randomnessProof: null,
+    vrfPending: false,
   });
 
   // Sync on-chain values into local state
@@ -232,17 +340,20 @@ export function usePowerball() {
       onChainMode: isOnChain,
       isBuyingOnChain,
       txHash: txHash ?? null,
+      vrfPending: vrfPendingRaw ? Boolean(vrfPendingRaw) : false,
       ...(onChainJackpot !== undefined ? { currentJackpot: onChainJackpot } : {}),
       ...(onChainTicketCount !== undefined ? { totalTicketsSold: onChainTicketCount } : {}),
+      ...(onChainRandomnessProof ? { randomnessProof: onChainRandomnessProof } : {}),
+      hasDoublePlayNFT: hasDoublePlayNFT === true || localNFT.doublePlay,
+      hasNoLossNFT: hasNoLossNFT === true || localNFT.noLoss,
     }));
-  }, [isOnChain, isBuyingOnChain, txHash, onChainJackpot, onChainTicketCount]);
+  }, [isOnChain, isBuyingOnChain, txHash, onChainJackpot, onChainTicketCount, onChainRandomnessProof, vrfPendingRaw, hasDoublePlayNFT, hasNoLossNFT, localNFT]);
 
   // ── Countdown timer ─────────────────────────────────────────
 
   useEffect(() => {
     const timer = setInterval(() => {
       setState(prev => {
-        // When on-chain, derive from nextDrawTime
         if (nextDrawTimeRaw && isOnChain) {
           const target = Number(nextDrawTimeRaw) * 1000;
           const diff = Math.max(0, target - Date.now());
@@ -256,19 +367,18 @@ export function usePowerball() {
             },
           };
         }
-        // Simulation countdown
         let { hours, minutes, seconds } = prev.countdown;
         seconds--;
         if (seconds < 0) { seconds = 59; minutes--; }
         if (minutes < 0) { minutes = 59; hours--; }
-        if (hours < 0) { hours = 23; minutes = 59; seconds = 59; }
+        if (hours < 0) { hours = 0; minutes = 5; seconds = 0; }
         return { ...prev, countdown: { hours, minutes, seconds } };
       });
     }, 1000);
     return () => clearInterval(timer);
   }, [nextDrawTimeRaw, isOnChain]);
 
-  // ── UI selection actions (always local) ─────────────────────
+  // ── UI selection actions ────────────────────────────────────
 
   const toggleNumber = useCallback((num: number) => {
     setState(prev => {
@@ -309,9 +419,7 @@ export function usePowerball() {
       const available = Array.from({ length: 69 }, (_, i) => i + 1)
         .filter(n => !prev.selectedNumbers.includes(n))
         .sort(() => Math.random() - 0.5);
-      const newNumbers = [...prev.selectedNumbers, ...available.slice(0, remaining)].sort(
-        (a, b) => a - b,
-      );
+      const newNumbers = [...prev.selectedNumbers, ...available.slice(0, remaining)].sort((a, b) => a - b);
       const newPowerball = prev.powerball ?? Math.floor(Math.random() * 26) + 1;
       return { ...prev, selectedNumbers: newNumbers, powerball: newPowerball };
     });
@@ -330,15 +438,15 @@ export function usePowerball() {
   const buyTickets = useCallback(() => {
     if (state.selectedNumbers.length !== 5 || state.powerball === null) return;
 
-    // ▸▸ ON-CHAIN: send tx to CyberPowerball contract
+    // ON-CHAIN: send tx to SimpleLottery contract
     if (isOnChain) {
       const price = ticketPriceRaw
         ? (ticketPriceRaw as bigint)
-        : parseEther('0.01');
+        : parseEther('0.001');
 
       writeContract({
-        address: CONTRACTS.CyberPowerball as `0x${string}`,
-        abi: CyberPowerballABI,
+        address: CONTRACTS.SimpleLottery,
+        abi: SimpleLotteryABI,
         functionName: 'buyTicket',
         args: [
           state.selectedNumbers as unknown as readonly [number, number, number, number, number],
@@ -347,17 +455,13 @@ export function usePowerball() {
         value: price,
       });
 
-      // Clear selection after initiating tx
       setState(prev => ({ ...prev, selectedNumbers: [], powerball: null }));
       return;
     }
 
-    // ▸▸ SIMULATION fallback (unchanged original logic)
+    // SIMULATION fallback
     setState(prev => {
       if (prev.selectedNumbers.length !== 5 || prev.powerball === null) return prev;
-
-      const isNoLoss = prev.playMode === 'no-loss' && prev.hasNoLossNFT;
-      const isDoublePlay = prev.playMode === 'double-play' && prev.hasDoublePlayNFT;
 
       const newTickets: PowerballTicket[] = [];
       for (let i = 0; i < prev.ticketCount; i++) {
@@ -366,33 +470,15 @@ export function usePowerball() {
           numbers: [...prev.selectedNumbers],
           powerball: prev.powerball!,
           timestamp: new Date(),
-          cost: 0.01,
+          cost: 0.001,
           matchedNumbers: 0,
           matchedPowerball: false,
           prize: 0,
           playMode: prev.playMode,
           drawRound: 1,
-          principalRedeemable: isNoLoss,
+          principalRedeemable: false,
         });
-        if (isDoublePlay) {
-          newTickets.push({
-            id: `ticket-${Date.now()}-${i}-r2`,
-            numbers: [...prev.selectedNumbers],
-            powerball: prev.powerball!,
-            timestamp: new Date(),
-            cost: 0,
-            matchedNumbers: 0,
-            matchedPowerball: false,
-            prize: 0,
-            playMode: 'double-play',
-            drawRound: 2,
-            principalRedeemable: false,
-          });
-        }
       }
-
-      const jackpotIncrease = isNoLoss ? 0 : 0.01 * prev.ticketCount * 0.5;
-      const noLossIncrease = isNoLoss ? 0.01 * prev.ticketCount : 0;
 
       return {
         ...prev,
@@ -400,20 +486,19 @@ export function usePowerball() {
         selectedNumbers: [],
         powerball: null,
         totalTicketsSold: prev.totalTicketsSold + prev.ticketCount,
-        currentJackpot: prev.currentJackpot + jackpotIncrease,
-        noLossPool: prev.noLossPool + noLossIncrease,
+        currentJackpot: prev.currentJackpot + 0.001 * prev.ticketCount * 0.5,
       };
     });
   }, [state.selectedNumbers, state.powerball, isOnChain, ticketPriceRaw, writeContract]);
 
-  // ── Claim prize (on-chain only) ─────────────────────────────
+  // ── Claim prize ─────────────────────────────────────────────
 
   const claimPrize = useCallback(
     (ticketId: bigint) => {
       if (!isOnChain) return;
       writeContract({
-        address: CONTRACTS.CyberPowerball as `0x${string}`,
-        abi: CyberPowerballABI,
+        address: CONTRACTS.SimpleLottery,
+        abi: SimpleLotteryABI,
         functionName: 'claimPrize',
         args: [ticketId],
       });
@@ -426,12 +511,9 @@ export function usePowerball() {
   const calculatePrize = useCallback(
     (matchedNumbers: number, matchedPowerball: boolean, jackpot: number) => {
       for (const tier of PRIZE_TIERS) {
-        if (
-          matchedNumbers >= tier.numbers &&
-          (tier.powerball === matchedPowerball || !tier.powerball)
-        ) {
+        if (matchedNumbers >= tier.numbers && (tier.powerball === matchedPowerball || !tier.powerball)) {
           if (tier.numbers === 5 && tier.powerball) return { prize: jackpot, tier: tier.label };
-          return { prize: 0.01 * tier.multiplier, tier: tier.label };
+          return { prize: 0.001 * tier.multiplier, tier: tier.label };
         }
       }
       return { prize: 0, tier: 'NO MATCH' };
@@ -440,9 +522,7 @@ export function usePowerball() {
   );
 
   const simulateDraw = useCallback(() => {
-    // On-chain: draws are triggered by Chainlink Automation, not manually
-    if (isOnChain) return;
-
+    // Simulate draw works in both modes for demo purposes
     setState(prev => ({ ...prev, isDrawing: true }));
 
     setTimeout(() => {
@@ -451,12 +531,6 @@ export function usePowerball() {
         .slice(0, 5)
         .sort((a, b) => a - b);
       const winningPowerball = Math.floor(Math.random() * 26) + 1;
-
-      const winningNumbers2 = Array.from({ length: 69 }, (_, i) => i + 1)
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 5)
-        .sort((a, b) => a - b);
-      const winningPowerball2 = Math.floor(Math.random() * 26) + 1;
 
       const newDraw: DrawResult = {
         id: `draw-${Date.now()}`,
@@ -468,38 +542,29 @@ export function usePowerball() {
 
       setState(prev => {
         newDraw.jackpot = prev.currentJackpot;
-
         const updatedTickets = prev.tickets.map(ticket => {
-          const drawNumbers = ticket.drawRound === 2 ? winningNumbers2 : winningNumbers;
-          const drawPowerball = ticket.drawRound === 2 ? winningPowerball2 : winningPowerball;
-          const matchedNumbers = ticket.numbers.filter(n => drawNumbers.includes(n)).length;
-          const matchedPowerball = ticket.powerball === drawPowerball;
-          const jackpotForCalc =
-            ticket.playMode === 'no-loss' ? prev.noLossPool : prev.currentJackpot;
-          const { prize } = calculatePrize(matchedNumbers, matchedPowerball, jackpotForCalc);
+          const matchedNumbers = ticket.numbers.filter(n => winningNumbers.includes(n)).length;
+          const matchedPowerball = ticket.powerball === winningPowerball;
+          const { prize } = calculatePrize(matchedNumbers, matchedPowerball, prev.currentJackpot);
           return { ...ticket, matchedNumbers, matchedPowerball, prize };
         });
 
-        const jackpotWon = updatedTickets.some(
-          t => t.matchedNumbers === 5 && t.matchedPowerball && t.playMode !== 'no-loss',
-        );
-        const yieldGain = prev.noLossPool * 0.003;
-
+        const jackpotWon = updatedTickets.some(t => t.matchedNumbers === 5 && t.matchedPowerball);
         return {
           ...prev,
           isDrawing: false,
           lastDraw: newDraw,
           drawHistory: [newDraw, ...prev.drawHistory].slice(0, 10),
           tickets: updatedTickets,
-          currentJackpot: jackpotWon ? 10 : prev.currentJackpot * 1.1,
-          countdown: { hours: 23, minutes: 59, seconds: 59 },
-          noLossPool: prev.noLossPool + yieldGain,
+          currentJackpot: jackpotWon ? 0.01 : prev.currentJackpot * 1.1,
+          countdown: { hours: 0, minutes: 5, seconds: 0 },
+          randomnessProof: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
         };
       });
     }, 3000);
-  }, [isOnChain, calculatePrize]);
+  }, [calculatePrize]);
 
-  // ── Return value (preserves interface for PowerballGame.tsx) ─
+  // ── Return ──────────────────────────────────────────────────
 
   const isComplete = state.selectedNumbers.length === 5 && state.powerball !== null;
 

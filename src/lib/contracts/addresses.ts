@@ -1,23 +1,27 @@
 /**
  * Deployed contract addresses on Sepolia testnet.
  *
- * After deploying with Hardhat / Foundry, paste the addresses here.
- * These are also overridable via environment variables so that
- * different environments (staging / prod) can use their own deployments.
+ * ===== INSTRUCTIONS =====
+ * After deploying via Remix, paste the deployed addresses below
+ * OR set them as environment variables in a .env file:
+ *
+ *   VITE_SIMPLE_LOTTERY_ADDRESS=0x...
+ *   VITE_SIMPLE_POKER_ADDRESS=0x...
+ *   VITE_GAME_NFT_ADDRESS=0x...
+ *   VITE_GAME_REFERRAL_ADDRESS=0x...
  */
 export const CONTRACTS = {
-  CyberPowerball: (import.meta.env.VITE_CYBERPOWERBALL_ADDRESS ||
-    '0x0000000000000000000000000000000000000000') as `0x${string}`,
+  SimpleLottery: (import.meta.env.VITE_SIMPLE_LOTTERY_ADDRESS ||
+    '0xd4e1dc41a69d8c3f502083a0a28556b949c083d9') as `0x${string}`,
 
-  TexasHoldemAIDuel: (import.meta.env.VITE_TEXASHOLDEM_ADDRESS ||
-    '0x0000000000000000000000000000000000000000') as `0x${string}`,
+  SimplePoker: (import.meta.env.VITE_SIMPLE_POKER_ADDRESS ||
+    '0xf0054591ac2115c4dee46d855b9d60f238b0e76c') as `0x${string}`,
+
+  GameNFT: (import.meta.env.VITE_GAME_NFT_ADDRESS ||
+    '0x5fa904c4e393a8e4c51b719806fd586376ad8b41') as `0x${string}`,
+
+  GameReferral: (import.meta.env.VITE_GAME_REFERRAL_ADDRESS ||
+    '0x34a51bf72382c17b3ba990f480b2b676845b1986') as `0x${string}`,
 } as const;
 
-/**
- * Sepolia Chainlink infrastructure addresses (for reference / deployment scripts)
- */
-export const CHAINLINK_SEPOLIA = {
-  VRF_COORDINATOR: '0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625',
-  KEY_HASH: '0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c',
-  LINK_TOKEN: '0x779877A7B0D9E8603169DdbD7836e478b4624789',
-} as const;
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`;

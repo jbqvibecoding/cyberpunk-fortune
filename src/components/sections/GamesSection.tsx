@@ -41,18 +41,18 @@ const GamesSection = () => {
                 <div className="grid grid-cols-3 gap-4 mb-6">
                   <div className="text-center p-3 rounded-lg bg-muted/30">
                     <Trophy className="h-5 w-5 text-accent mx-auto mb-1" />
-                    <span className="font-mono text-accent text-lg font-bold">247 ETH</span>
+                    <span className="font-mono text-accent text-lg font-bold">LIVE</span>
                     <p className="text-xs text-muted-foreground">Jackpot</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-muted/30">
                     <Clock className="h-5 w-5 text-primary mx-auto mb-1" />
-                    <span className="font-mono text-primary text-lg font-bold">12:34:56</span>
-                    <p className="text-xs text-muted-foreground">Next Draw</p>
+                    <span className="font-mono text-primary text-lg font-bold">5 min</span>
+                    <p className="text-xs text-muted-foreground">Draw Interval</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-muted/30">
                     <Users className="h-5 w-5 text-secondary mx-auto mb-1" />
-                    <span className="font-mono text-secondary text-lg font-bold">4,892</span>
-                    <p className="text-xs text-muted-foreground">Tickets</p>
+                    <span className="font-mono text-secondary text-lg font-bold">0.001</span>
+                    <p className="text-xs text-muted-foreground">ETH / Ticket</p>
                   </div>
                 </div>
 
@@ -92,18 +92,18 @@ const GamesSection = () => {
                 <div className="grid grid-cols-3 gap-4 mb-6">
                   <div className="text-center p-3 rounded-lg bg-muted/30">
                     <Zap className="h-5 w-5 text-accent mx-auto mb-1" />
-                    <span className="font-mono text-accent text-lg font-bold">&lt;10s</span>
+                    <span className="font-mono text-accent text-lg font-bold">&lt;1s</span>
                     <p className="text-xs text-muted-foreground">AI Response</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-muted/30">
                     <Trophy className="h-5 w-5 text-primary mx-auto mb-1" />
-                    <span className="font-mono text-primary text-lg font-bold">0.1-10</span>
-                    <p className="text-xs text-muted-foreground">ETH Stakes</p>
+                    <span className="font-mono text-primary text-lg font-bold">0.001</span>
+                    <p className="text-xs text-muted-foreground">ETH Min</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-muted/30">
                     <Users className="h-5 w-5 text-secondary mx-auto mb-1" />
-                    <span className="font-mono text-secondary text-lg font-bold">127</span>
-                    <p className="text-xs text-muted-foreground">Active</p>
+                    <span className="font-mono text-secondary text-lg font-bold">1v1</span>
+                    <p className="text-xs text-muted-foreground">AI Duel</p>
                   </div>
                 </div>
 

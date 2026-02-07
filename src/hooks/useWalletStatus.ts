@@ -1,8 +1,6 @@
 import { useAccount, useChainId } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
-import { CONTRACTS } from '@/lib/contracts/addresses';
-
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+import { CONTRACTS, ZERO_ADDRESS } from '@/lib/contracts/addresses';
 
 /**
  * Shared hook that exposes wallet connection state + contract deployment status.
@@ -14,13 +12,9 @@ export function useWalletStatus() {
 
   const isCorrectChain = chainId === sepolia.id;
 
-  const isPowerballDeployed =
-    CONTRACTS.CyberPowerball !== ZERO_ADDRESS &&
-    CONTRACTS.CyberPowerball !== ('0x0000000000000000000000000000000000000000' as `0x${string}`);
+  const isPowerballDeployed = CONTRACTS.SimpleLottery !== ZERO_ADDRESS;
 
-  const isPokerDeployed =
-    CONTRACTS.TexasHoldemAIDuel !== ZERO_ADDRESS &&
-    CONTRACTS.TexasHoldemAIDuel !== ('0x0000000000000000000000000000000000000000' as `0x${string}`);
+  const isPokerDeployed = CONTRACTS.SimplePoker !== ZERO_ADDRESS;
 
   return {
     address,
