@@ -3,6 +3,7 @@ import HeroSection from '@/components/sections/HeroSection';
 import GamesSection from '@/components/sections/GamesSection';
 import PowerballGame from '@/components/games/PowerballGame';
 import PokerGame from '@/components/games/PokerGame';
+import AdvancedFeatures from '@/components/sections/AdvancedFeatures';
 import Footer from '@/components/sections/Footer';
 
 const Index = () => {
@@ -13,6 +14,7 @@ const Index = () => {
       <GamesSection />
       <PowerballGame />
       <PokerGame />
+      <AdvancedFeatures />
       <Footer />
     </div>
   );
