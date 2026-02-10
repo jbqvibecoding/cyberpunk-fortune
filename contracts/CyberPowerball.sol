@@ -129,7 +129,7 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
         address _vrfCoordinator,
         uint64 _subscriptionId,
         bytes32 _keyHash
-    ) VRFConsumerBaseV2(_vrfCoordinator) Ownable(msg.sender) {
+    ) VRFConsumerBaseV2(_vrfCoordinator) Ownable() {
         vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
         subscriptionId = _subscriptionId;
         keyHash = _keyHash;

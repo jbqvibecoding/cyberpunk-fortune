@@ -1,6 +1,10 @@
 require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 
+// Optional plugins (installed in devDependencies)
+require("solidity-coverage");
+require("hardhat-gas-reporter");
+
 const DEPLOYER_KEY = process.env.DEPLOYER_PRIVATE_KEY || "";
 const SEPOLIA_RPC = process.env.VITE_SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
 const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY || "";
@@ -13,6 +17,11 @@ module.exports = {
       optimizer: { enabled: true, runs: 200 },
       viaIR: true,
     },
+  },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS === "true",
+    currency: "USD",
+    showTimeSpent: true,
   },
   networks: {
     hardhat: {},

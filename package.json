@@ -12,9 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:solidity": "hardhat test",
-    "test:solidity:coverage": "npx hardhat coverage || echo \"Install solidity-coverage for coverage reports\"",
-    "test:gas": "hardhat test --grep gas",
-    "fuzz:foundry": "echo \"Run Foundry (forge) fuzz tests locally; see TESTING.md\""
+    "test:solidity:coverage": "hardhat coverage",
+    "test:gas": "cross-env REPORT_GAS=true hardhat test --grep gas",
+    "test:fuzz": "hardhat test test/fuzz/**/*.ts",
+    "fuzz:foundry": "echo \"Optional: run Foundry fuzz tests locally; see TESTING.md\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -71,7 +72,9 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
     "@chainlink/contracts": "^1.5.0",
+      "cross-env": "^7.0.3",
     "@eslint/js": "^9.32.0",
     "@nomicfoundation/hardhat-ethers": "^3.1.3",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
@@ -86,14 +89,17 @@
     "autoprefixer": "^10.4.21",
     "dotenv": "^17.2.4",
     "eslint": "^9.32.0",
+      "fast-check": "^3.23.2",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "ethers": "^6.16.0",
     "globals": "^15.15.0",
     "hardhat": "^2.28.4",
+    "hardhat-gas-reporter": "^1.0.10",
     "jsdom": "^20.0.3",
     "lovable-tagger": "^1.1.13",
     "postcss": "^8.5.6",
+    "solidity-coverage": "^0.8.16",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",

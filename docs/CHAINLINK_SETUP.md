@@ -1,132 +1,132 @@
-# Chainlink 服务配置指南
+# Chainlink Setup Guide
 
-本文档详细说明如何在 Sepolia 测试网上配置 Pioneer 项目所需的三个 Chainlink 服务。
-
----
-
-## 目录
-
-1. [前置准备](#1-前置准备)
-2. [Chainlink VRF V2 — 可验证随机数](#2-chainlink-vrf-v2--可验证随机数)
-3. [Chainlink Automation — 自动化触发](#3-chainlink-automation--自动化触发)
-4. [Chainlink Functions — AI 决策](#4-chainlink-functions--ai-决策)
-5. [各合约的 Chainlink 服务需求汇总](#5-各合约的-chainlink-服务需求汇总)
-6. [费用估算](#6-费用估算)
-7. [常见问题排查](#7-常见问题排查)
+This document explains how to configure the three Chainlink services used by Pioneer on the Sepolia testnet.
 
 ---
 
-## 1. 前置准备
+## Table of contents
 
-### 1.1 获取 Sepolia ETH
+1. [Prerequisites](#1-prerequisites)
+2. [Chainlink VRF v2 — verifiable randomness](#2-chainlink-vrf-v2--verifiable-randomness)
+3. [Chainlink Automation — scheduled execution](#3-chainlink-automation--scheduled-execution)
+4. [Chainlink Functions — AI decisions](#4-chainlink-functions--ai-decisions)
+5. [Service matrix by contract](#5-service-matrix-by-contract)
+6. [Cost estimates](#6-cost-estimates)
+7. [Troubleshooting](#7-troubleshooting)
 
-- 水龙头: https://sepoliafaucet.com/ 或 https://www.alchemy.com/faucets/ethereum-sepolia
-- 建议至少获取 **0.5 Sepolia ETH**
+---
 
-### 1.2 获取 Sepolia LINK
+## 1. Prerequisites
 
-- 水龙头: https://faucets.chain.link/sepolia
-- 每次可领取 **25 LINK**
-- 建议至少获取 **50 LINK**（VRF + Functions + Automation 均需要 LINK）
+### 1.1 Get Sepolia ETH
 
-### 1.3 关键地址（Sepolia 测试网）
+- Faucets: https://sepoliafaucet.com/ or https://www.alchemy.com/faucets/ethereum-sepolia
+- Suggested: at least **0.5 Sepolia ETH**
 
-| 服务 | 合约地址 |
+### 1.2 Get Sepolia LINK
+
+- Faucet: https://faucets.chain.link/sepolia
+- Typically you can claim **25 LINK** per request
+- Suggested: at least **50 LINK** (VRF + Functions + Automation)
+
+### 1.3 Key addresses (Sepolia)
+
+| Service | Address |
 |------|---------|
-| VRF Coordinator V2 | `0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625` |
-| VRF Key Hash (200 gwei) | `0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c` |
-| LINK Token | `0x779877A7B0D9E8603169DdbD7836e478b4624789` |
-| Functions Router | `0xb83E47C2bC239B3bf370bc41e1459A34b41238D0` |
-| Automation Registry | 通过 https://automation.chain.link 自动管理 |
+| VRF Coordinator v2 | `0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625` |
+| VRF Key Hash (200 gwei lane) | `0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c` |
+| LINK token | `0x779877A7B0D9E8603169DdbD7836e478b4624789` |
+| Functions router | `0xb83E47C2bC239B3bf370bc41e1459A34b41238D0` |
+| Automation registry | Managed via https://automation.chain.link |
 
 ---
 
-## 2. Chainlink VRF V2 — 可验证随机数
+## 2. Chainlink VRF v2 — verifiable randomness
 
-**用途：** CyberPowerball 抽奖、TexasHoldem 发牌、MultiplayerPokerTable 洗牌
+**Used for:** CyberPowerball draws, TexasHoldem card dealing, MultiplayerPokerTable shuffling
 
-### 2.1 创建 VRF Subscription
+### 2.1 Create a VRF subscription
 
-1. 打开 https://vrf.chain.link
-2. 连接你的 **部署者钱包**（MetaMask）
-3. 切换到 **Sepolia** 网络
-4. 点击 **"Create Subscription"**
-5. 确认交易，记录你的 **Subscription ID**（数字，例如 `12345`）
+1. Open https://vrf.chain.link
+2. Connect your **deployer wallet** (MetaMask)
+3. Switch to **Sepolia**
+4. Click **Create Subscription**
+5. Confirm and record the **Subscription ID** (e.g. `12345`)
 
-### 2.2 为 Subscription 充值 LINK
+### 2.2 Fund the subscription with LINK
 
-1. 在 VRF 管理页面点击你的 Subscription
-2. 点击 **"Fund Subscription"**
-3. 输入 **10 LINK**（够测试使用很久）
-4. 确认交易
+1. Open your subscription
+2. Click **Fund Subscription**
+3. Fund with **10 LINK** (usually enough for testing)
+4. Confirm
 
-### 2.3 添加 Consumer 合约
+### 2.3 Add consumer contracts
 
-部署合约后，需要把合约地址注册为 VRF Consumer：
+After deploying contracts, add them as VRF consumers:
 
-1. 在 Subscription 详情页点击 **"Add Consumer"**
-2. 粘贴 **CyberPowerball 合约地址**，确认交易
-3. 再次点击 **"Add Consumer"**
-4. 粘贴 **TexasHoldemAIDuel 合约地址**，确认交易
+1. Click **Add Consumer**
+2. Paste the **CyberPowerball** address and confirm
+3. Click **Add Consumer** again
+4. Paste the **TexasHoldemAIDuel** address and confirm
 
-> ⚠️ **不添加 Consumer 的话，合约请求随机数会 revert！**
+⚠️ If you don't add the consumer, VRF requests will revert.
 
-### 2.4 VRF 参数说明
+### 2.4 VRF parameters
 
-| 参数 | CyberPowerball | TexasHoldemAIDuel |
+| Parameter | CyberPowerball | TexasHoldemAIDuel |
 |------|---------------|------------------|
-| numWords | 6（5主球+1强力球） | 9（2玩家+2AI+5公共牌） |
+| numWords | 6 (5 main + 1 powerball) | 9 (2 player + 2 AI + 5 community) |
 | callbackGasLimit | 500,000 | 500,000 |
 | requestConfirmations | 3 | 3 |
 | keyHash | 200 gwei lane | 200 gwei lane |
 
 ---
 
-## 3. Chainlink Automation — 自动化触发
+## 3. Chainlink Automation — scheduled execution
 
-**用途：** 自动触发 CyberPowerball 定时抽奖（无需人工干预）
+**Used for:** triggering CyberPowerball scheduled draws automatically.
 
-### 3.1 工作原理
+### 3.1 How it works
 
-CyberPowerball 合约实现了 `AutomationCompatibleInterface`：
+CyberPowerball implements `AutomationCompatibleInterface`:
 
-- `checkUpkeep()` — Chainlink 节点定期调用，检查是否到了抽奖时间
-- `performUpkeep()` — 条件满足时自动执行，向 VRF 请求随机数，触发抽奖
+- `checkUpkeep()` — called periodically to decide whether upkeep is needed
+- `performUpkeep()` — executed when needed; requests VRF randomness and starts the draw
 
-### 3.2 注册 Upkeep
+### 3.2 Register an upkeep
 
-1. 打开 https://automation.chain.link
-2. 连接部署者钱包，切换到 Sepolia
-3. 点击 **"Register New Upkeep"**
-4. 选择 **"Custom logic"**（自定义逻辑）
-5. 填写信息：
+1. Open https://automation.chain.link
+2. Connect the deployer wallet and switch to Sepolia
+3. Click **Register New Upkeep**
+4. Choose **Custom logic**
+5. Fill in:
 
-| 字段 | 值 |
+| Field | Value |
 |------|-----|
-| Target contract address | `<你的 CyberPowerball 合约地址>` |
+| Target contract address | `<your CyberPowerball address>` |
 | Upkeep name | `Pioneer Powerball Draw` |
-| Gas limit | `750000`（需要覆盖 VRF 请求 + performUpkeep 逻辑） |
+| Gas limit | `750000` (must cover performUpkeep + VRF request) |
 | Starting balance | `5 LINK` |
-| Check data | `0x`（留空） |
+| Check data | `0x` |
 
-6. 确认交易，完成注册
+6. Confirm the transaction to complete registration
 
-### 3.3 验证 Automation 工作
+### 3.3 Verify Automation
 
-注册完成后，可以在 Automation 管理页面看到：
+After registration, on the Automation dashboard you should see:
 
 - **Status**: Active
-- **Last performed**: 会在下一个抽奖时间到达后显示
-- **Balance**: 你充入的 LINK 余额
+- **Last performed**: updates after the next scheduled draw
+- **Balance**: your funded LINK balance
 
-如果 Upkeep 长时间不触发，检查：
-- `checkUpkeep()` 返回的 `upkeepNeeded` 是否为 `true`
-- 是否有玩家购买了彩票（totalTickets > 0）
-- `nextDrawTime` 是否已经过了当前时间
+If it doesn't trigger for a long time, check:
+- `checkUpkeep()` returns `upkeepNeeded == true`
+- At least one ticket exists (e.g. `totalTickets > 0`)
+- `nextDrawTime` is in the past
 
-### 3.4 手动触发测试
+### 3.4 Manually trigger for testing
 
-在测试时，你可以通过 Hardhat 控制台手动调用 `performUpkeep`：
+During testing, you can call `performUpkeep` manually from the Hardhat console:
 
 ```bash
 npx hardhat console --network sepolia
@@ -145,44 +145,44 @@ if (upkeepNeeded) {
 
 ---
 
-## 4. Chainlink Functions — AI 决策
+## 4. Chainlink Functions — AI decisions
 
-**用途：** TexasHoldemAIDuel 中 AI 对手的决策引擎（调用外部 LLM API）
+**Used for:** AI opponent decisions in TexasHoldemAIDuel (off-chain LLM calls)
 
-> ⚠️ **当前状态**：合约中 AI 决策目前使用**链上模拟**（`_simulateAIDecision`），
-> Chainlink Functions 回调 `_fulfillRequest` 已预留但为 no-op。
-> 若需连接真正的 LLM（如 OpenAI），需修改合约中 `_requestAIDecision` 函数的实现。
+⚠️ **Current status:** AI decisions currently use an **on-chain simulation** (`_simulateAIDecision`).
+The Chainlink Functions callback `_fulfillRequest` is present but effectively a no-op.
+To integrate a real LLM (e.g., OpenAI), you must implement `_requestAIDecision` and parse results in `_fulfillRequest`.
 
-### 4.1 创建 Functions Subscription
+### 4.1 Create a Functions subscription
 
-1. 打开 https://functions.chain.link
-2. 连接部署者钱包，切换到 Sepolia
-3. 点击 **"Create Subscription"**
-4. 确认交易，记录 **Subscription ID**
+1. Open https://functions.chain.link
+2. Connect the deployer wallet and switch to Sepolia
+3. Click **Create Subscription**
+4. Confirm and record the **Subscription ID**
 
-### 4.2 充值 LINK
+### 4.2 Fund with LINK
 
-1. 在 Subscription 详情页点击 **"Fund"**
-2. 充入 **5 LINK**
-3. 确认交易
+1. Open the subscription details and click **Fund**
+2. Fund with **5 LINK**
+3. Confirm
 
-### 4.3 添加 Consumer
+### 4.3 Add a consumer
 
-1. 点击 **"Add Consumer"**
-2. 粘贴 **TexasHoldemAIDuel 合约地址**
-3. 确认交易
+1. Click **Add Consumer**
+2. Paste the **TexasHoldemAIDuel** contract address
+3. Confirm
 
-### 4.4 未来启用真实 LLM 的步骤
+### 4.4 Steps to enable a real LLM later
 
-要让 AI 使用真实的 OpenAI API：
+To make the AI use the real OpenAI API:
 
-1. 修改 `_requestAIDecision()` 函数，改为调用 `_sendRequest()`
-2. 在 `_fulfillRequest()` 中解析 LLM 返回的决策
-3. 使用 Chainlink Functions 的 **Secrets Manager** 上传 OpenAI API Key
-4. Functions 的 JavaScript 源码需要发起 HTTP 请求到 OpenAI
+1. Implement `_requestAIDecision()` to call `_sendRequest()`
+2. Parse the LLM response in `_fulfillRequest()`
+3. Upload the OpenAI API key via the Chainlink Functions **Secrets Manager**
+4. The Functions JavaScript source must make an HTTP request to OpenAI
 
 ```javascript
-// Functions 源码示例 (链下执行，返回结果上链)
+// Example Functions source (runs off-chain and returns on-chain)
 const prompt = args[0]; // AI prompt from contract
 const response = await Functions.makeHttpRequest({
   url: "https://api.openai.com/v1/chat/completions",
@@ -199,65 +199,65 @@ return Functions.encodeString(response.data.choices[0].message.content);
 
 ---
 
-## 5. 各合约的 Chainlink 服务需求汇总
+## 5. Service matrix by contract
 
-| 合约 | VRF V2 | Automation | Functions |
+| Contract | VRF v2 | Automation | Functions |
 |------|:------:|:----------:|:---------:|
-| **CyberPowerball** | ✅ 6 words | ✅ 定时抽奖 | ❌ |
-| **TexasHoldemAIDuel** | ✅ 9 words | ❌ | ✅ AI 决策 (预留) |
+| **CyberPowerball** | ✅ 6 words | ✅ scheduled draws | ❌ |
+| **TexasHoldemAIDuel** | ✅ 9 words | ❌ | ✅ AI decisions (stubbed) |
 | **MultiplayerPokerTable** | ✅ 1 word | ❌ | ❌ |
 
-### 完整配置清单
+### Full configuration checklist
 
-部署完成后，确保以下全部完成：
+After deployment, ensure all of the following are completed:
 
-- [ ] VRF Subscription 已创建并充值 ≥ 10 LINK
-- [ ] CyberPowerball 地址已添加为 VRF Consumer
-- [ ] TexasHoldemAIDuel 地址已添加为 VRF Consumer
-- [ ] Automation Upkeep 已注册（指向 CyberPowerball）并充值 ≥ 5 LINK
-- [ ] Functions Subscription 已创建并充值 ≥ 5 LINK
-- [ ] TexasHoldemAIDuel 地址已添加为 Functions Consumer
-- [ ] `.env` 文件中已填入正确的合约地址
+- [ ] VRF subscription created and funded (>= 10 LINK)
+- [ ] CyberPowerball added as VRF consumer
+- [ ] TexasHoldemAIDuel added as VRF consumer
+- [ ] Automation upkeep registered (targets CyberPowerball) and funded (>= 5 LINK)
+- [ ] Functions subscription created and funded (>= 5 LINK)
+- [ ] TexasHoldemAIDuel added as Functions consumer
+- [ ] `.env` contains correct deployed addresses
 
 ---
 
-## 6. 费用估算
+## 6. Cost estimates
 
-| 服务 | 每次调用费用 (LINK) | 测试频率 | 月估算 |
+| Service | Cost per call (LINK) | Test frequency | Monthly estimate |
 |------|:------------------:|---------|--------|
-| VRF (Powerball, 6 words) | ~0.25 | 每天 1 次 | ~7.5 LINK |
-| VRF (Poker, 9 words) | ~0.35 | 每局 1 次 | 取决于玩家 |
-| Automation (performUpkeep) | ~0.1 | 每天 1 次 | ~3 LINK |
-| Functions (AI 决策) | ~0.2 | 目前未启用 | 0 |
+| VRF (Powerball, 6 words) | ~0.25 | once per day | ~7.5 LINK |
+| VRF (Poker, 9 words) | ~0.35 | per hand | depends on usage |
+| Automation (performUpkeep) | ~0.1 | once per day | ~3 LINK |
+| Functions (AI decisions) | ~0.2 | currently not enabled | 0 |
 
-> 📌 Sepolia 测试网的 LINK 是免费的，所以费用仅供正式部署参考。
+Note: Sepolia LINK is free (testnet); these numbers are for mainnet-style intuition only.
 
 ---
 
-## 7. 常见问题排查
+## 7. Troubleshooting
 
-### VRF 请求没有回调
+### VRF request has no callback
 
-| 可能原因 | 解决方案 |
+| Possible cause | Fix |
 |---------|---------|
-| 合约未添加为 Consumer | 在 vrf.chain.link 添加 |
-| Subscription LINK 余额不足 | 充值更多 LINK |
-| callbackGasLimit 不够 | 调用 `setVRFConfig()` 增大（仅 CyberPowerball 支持） |
-| 网络拥堵 | 等待或提高 gas |
+| Contract not added as consumer | Add it in vrf.chain.link |
+| Subscription LINK balance too low | Fund with more LINK |
+| callbackGasLimit too low | Increase via `setVRFConfig()` (CyberPowerball only) |
+| Network congestion | Wait or increase gas |
 
-### Automation 不触发
+### Automation does not trigger
 
-| 可能原因 | 解决方案 |
+| Possible cause | Fix |
 |---------|---------|
-| checkUpkeep 返回 false | 确认时间已过 + 有售出的票 |
-| Upkeep LINK 余额不足 | 充值更多 LINK |
-| Gas limit 太低 | 在 Automation 管理页调高 |
-| 合约暂停 | 检查合约 `paused` 状态 |
+| checkUpkeep returns false | Ensure time passed and at least one ticket sold |
+| Upkeep LINK balance too low | Fund with more LINK |
+| Gas limit too low | Increase in the Automation dashboard |
+| Contract paused | Check the contract `paused` state |
 
-### Functions 回调失败
+### Functions callback fails
 
-| 可能原因 | 解决方案 |
+| Possible cause | Fix |
 |---------|---------|
-| 当前为模拟模式 | 合约使用 `_simulateAIDecision`，Functions 未实际调用 |
-| Consumer 未注册 | 在 functions.chain.link 添加 |
-| 源码执行超时 | 精简 JS 源码或增大 gasLimit |
+| Still using simulation mode | Contract uses `_simulateAIDecision`; Functions not invoked |
+| Consumer not registered | Add it in functions.chain.link |
+| Source execution timeout | Simplify the JS source or increase gasLimit |

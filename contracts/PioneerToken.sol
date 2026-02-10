@@ -17,12 +17,12 @@ contract PioneerToken is ERC20, Ownable {
         address initialOwner
     ) 
         ERC20(name, symbol) 
-        Ownable(initialOwner) 
+        Ownable() 
     {}
 
     /**
-     * @dev 铸造代币，只有所有者可以调用
-     * @param to 接收代币的地址
+     * @dev Mint tokens, only owner can call
+     * @param to Recipient address
      * @param amount 铸造数量
      */
     function mint(address to, uint256 amount) external onlyOwner {

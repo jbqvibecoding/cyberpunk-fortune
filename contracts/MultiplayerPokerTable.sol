@@ -64,14 +64,16 @@ contract MultiplayerPokerTable is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     event RoundResolved(uint256 indexed roundId, address[] winners, uint256[] amounts);
     event RandomnessRevealed(uint256 indexed requestId, bytes32 randomnessHash);
 
-    // 修复点：在构造函数中显式初始化 Ownable(msg.sender)
+    /**
+     * @notice Constructor for MultiplayerPokerTable
+     */
     constructor(
         address _vrfCoordinator, 
         uint64 _subscriptionId, 
         bytes32 _keyHash
     ) 
         VRFConsumerBaseV2(_vrfCoordinator) 
-        Ownable(msg.sender) 
+        Ownable() 
     {
         vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
         subscriptionId = _subscriptionId;

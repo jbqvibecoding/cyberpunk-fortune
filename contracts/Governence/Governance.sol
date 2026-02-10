@@ -8,23 +8,26 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 
 contract Governance is
-    GovernorVotesQuorumFraction,
+    Governor,
     GovernorSettings,
     GovernorCountingSimple,
-    GovernorVotes
+    GovernorVotes,
+    GovernorVotesQuorumFraction
 {
     constructor(IVotes _token)
         Governor("CyberpunkFortune Governance")
         GovernorSettings(
-            1,           // votingDelay: 1 block
-            45818,       // votingPeriod: ~1 week (12s/block)
-            0            // proposalThreshold: 0 tokens
+            1,           // votingDelay
+            45818,       // votingPeriod
+            0            // proposalThreshold
         )
         GovernorVotes(_token)
-        GovernorVotesQuorumFraction(4) // 4% quorum
+        GovernorVotesQuorumFraction(4)
     {}
 
-    // 解决多重继承冲突：显式指定使用 GovernorVotesQuorumFraction 的版本
+    /**
+     * @dev Supports interface for both Governor and GovernorVotes
+     */
     function supportsInterface(bytes4 interfaceId)
         public
         view
@@ -35,7 +38,9 @@ contract Governance is
         return super.supportsInterface(interfaceId);
     }
 
-    // 显式 override propose（避免继承链歧义）
+    /**
+     * @dev Propose function override to handle conflicts
+     */
     function propose(
         address[] memory targets,
         uint256[] memory values,
@@ -50,7 +55,9 @@ contract Governance is
         return super.propose(targets, values, calldatas, description);
     }
 
-    // 可选：override 其他冲突函数（如 cancel、_execute 等）
+    /**
+     * @dev Cancel function override to handle conflicts
+     */
     function cancel(
         address[] memory targets,
         uint256[] memory values,
