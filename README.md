@@ -1,6 +1,6 @@
-# Cyberpunk Fortune (Pioneer)
+# Pioneer
 
-Cyberpunk Fortune is a course/demo full-stack Web3 dApp:
+Pioneer is a course/demo full-stack Web3 dApp:
 
 - Frontend: React + Vite + TypeScript + Tailwind/shadcn UI
 - Smart contracts: Solidity (Hardhat) covering a lottery and poker flows
