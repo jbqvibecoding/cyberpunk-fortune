@@ -1,3 +1,105 @@
+ # Cyberpunk Fortune
+
+This repository contains the Cyberpunk Fortune dApp: a frontend (React + Vite + TypeScript) and several Solidity smart contracts (Hardhat) for a demo lottery & poker platform. The project was simplified for course/demo use and includes four lightweight on-chain contracts deployable via Remix or Hardhat.
+
+## Contents
+
+- `contracts/` — Solidity contracts (including `contracts/simple` demo contracts)
+- `src/` — React + TypeScript frontend
+- `test/` — Solidity tests (Hardhat)
+- `scripts/` — deployment helper scripts
+
+---
+
+## Architecture Design
+
+Overview:
+
+- Frontend: React + Vite + wagmi/viem + RainbowKit for wallet connectivity.
+- Smart contracts: Solidity ^0.8.19. Simple, self-contained contracts in `contracts/simple` for easy Remix deployment (no external Chainlink dependencies).
+- Deployment: Contracts can be deployed using Remix (recommended for quick demo) or Hardhat for local/full-stack testing.
+
+Data flow and components:
+
+- Wallet → Frontend (wagmi) → Contracts (via ethers/viem)
+- `SimpleLottery` and `SimplePoker` implement commit-reveal patterns for randomness simulation
+- `GameNFT` is a minimal ERC-721 used to gate premium play modes
+- `GameReferral` tracks on-chain referrals and rewards
+
+---
+
+## Security Analysis
+
+This section documents key security considerations and mitigations implemented across contracts.
+
+- Access Control: Owner-only functions are protected with `onlyOwner` modifier. Sensitive functions that update state must be restricted to owner.
+- Re-entrancy: Contracts are simple and avoid external calls in critical sections. If external calls are introduced, add `ReentrancyGuard` or pull-over-push pattern.
+- Arithmetic Safety: Solidity ^0.8.x has built-in overflow checks. Avoid unchecked blocks unless gas-optimizing and safe.
+- Input Validation: Functions validate inputs (e.g., token type ranges, non-zero addresses).
+- Randomness: Demo contracts use commit-reveal / simulated VRF. This is NOT production-grade — do not use for real high-value lotteries.
+- Refunds & Pull Payments: Prize withdrawals are implemented as pull payments where appropriate to avoid forced transfers.
+
+Audit recommendations (before production):
+
+- Full formal audit for economic attack vectors (front-running, oracle manipulation).
+- Use a secure randomness Oracle (Chainlink VRF) for production randomness.
+- Penetration testing for all off-chain integrations (OpenAI, ENS resolution, 3rd-party RPC endpoints).
+
+---
+
+## Gas Optimization Report
+
+Summary of gas-related design choices and optimizations applied:
+
+- Use minimal storage writes: prefer mappings and compact types (e.g., `uint8` for enum values).
+- Batch operations where possible to avoid multiple transactions.
+- Avoid unnecessary events that increase logs cost unless required for monitoring/auditing.
+- Use unchecked blocks only where overflow is mathematically impossible (document these spots carefully).
+
+Suggested steps to measure and improve gas further:
+
+- Run `hardhat test` with `hardhat-gas-reporter` or use `forge` (Foundry) to collect gas usage per function.
+- Identify hot-paths (e.g., ticket purchase, prize distribution) and reduce storage ops / external calls.
+
+---
+
+## Deployment Guide
+
+Quick deploy (Remix + MetaMask — Sepolia recommended for demo):
+
+1. Open `remix.ethereum.org`, create a new workspace, paste each contract from `contracts/simple/*.sol`.
+2. Compile with Solidity `^0.8.19`.
+3. In *Deploy & Run* set environment to `Injected Provider - MetaMask` and ensure MetaMask is set to Sepolia.
+4. Deploy contracts one by one. Copy deployed addresses.
+5. Open `src/lib/contracts/addresses.ts` and replace the `GameNFT`, `SimpleLottery`, `SimplePoker`, and `GameReferral` addresses with the deployed addresses (or set respective `VITE_` env vars and restart dev server).
+
+Hardhat (local testing / scripted deploy):
+
+1. Install dependencies: `npm install`.
+2. Compile: `npx hardhat compile`.
+3. Run tests: `npm run test:solidity`.
+4. To deploy to a network, configure `hardhat.config.cjs` with an RPC key and private key, then run a deploy script.
+
+---
+
+## NatSpec & Documentation
+
+All public functions in Solidity contracts include NatSpec-style comments where appropriate. For production, ensure every externally visible function has a clear `@notice` and `@dev` annotation.
+
+Example:
+
+```solidity
+/// @notice Mint a pass NFT (one per address per type)
+/// @dev Uses an internal mapping to prevent double-mint
+function mintPass(uint8 _type) external { ... }
+```
+
+---
+
+## Contact / Contribution
+
+If you need help preparing slides or demo steps for your course, open an issue or contact the maintainer.
+
 # Pioneer — Cyberpunk Web3 Gaming Platform
 
 > 去中心化博彩游戏平台 · Ethereum Sepolia · Chainlink VRF · React 18

@@ -17,7 +17,10 @@ contract Referral is Ownable {
 
     event ReferralRegistered(address indexed referrer, address indexed referredUser, uint256 reward);
 
-    constructor(address _rewardToken, uint256 _rewardAmount) {
+    /**
+     * @notice Constructor now passes msg.sender to Ownable to fix the TypeError
+     */
+    constructor(address _rewardToken, uint256 _rewardAmount) Ownable(msg.sender) {
         rewardToken = IERC20(_rewardToken);
         rewardAmount = _rewardAmount;
     }

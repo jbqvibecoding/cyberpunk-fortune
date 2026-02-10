@@ -7,7 +7,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract NFTPass is ERC721URIStorage, Ownable {
     uint256 public counter;
 
-    constructor(string memory name, string memory symbol) ERC721(name, symbol) {}
+    // 修复了 Ownable 构造函数缺失参数的问题
+    constructor(string memory name, string memory symbol) 
+        ERC721(name, symbol) 
+        Ownable(msg.sender) 
+    {}
 
     function mintPass(address to, string calldata uri) public onlyOwner returns (uint256) {
         counter++;

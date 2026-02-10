@@ -10,12 +10,14 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 /**
  * @title MultiplayerPokerTable
  * @notice Simplified turn-based multiplayer table that supports ETH or ERC20 buy-ins, commit-reveal actions,
- *         VRF randomness recording (for shuffling), pull payouts, and house fee.
+ * VRF randomness recording (for shuffling), pull payouts, and house fee.
  * @dev This is an MVP; actual poker logic (hand evaluation, side pots) is intended to be resolved off-chain or
- * by an oracle/admin via `resolveRound` for now. VRF is used to provide verifiable randomness for shuffling.
+ * by an oracle/admin via `resolveRound` for now.
+ * VRF is used to provide verifiable randomness for shuffling.
  */
 contract MultiplayerPokerTable is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     VRFCoordinatorV2Interface public immutable vrfCoordinator;
+
     uint64 public subscriptionId;
     bytes32 public keyHash;
     uint32 public callbackGasLimit = 200000;
@@ -43,6 +45,7 @@ contract MultiplayerPokerTable is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
 
     // pending withdrawals per token -> user
     mapping(address => mapping(address => uint256)) public pendingWithdrawals;
+    
     // house balances per token
     mapping(address => uint256) public houseBalances;
     uint16 public houseFeeBps;
@@ -61,7 +64,15 @@ contract MultiplayerPokerTable is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     event RoundResolved(uint256 indexed roundId, address[] winners, uint256[] amounts);
     event RandomnessRevealed(uint256 indexed requestId, bytes32 randomnessHash);
 
-    constructor(address _vrfCoordinator, uint64 _subscriptionId, bytes32 _keyHash) VRFConsumerBaseV2(_vrfCoordinator) {
+    // 修复点：在构造函数中显式初始化 Ownable(msg.sender)
+    constructor(
+        address _vrfCoordinator, 
+        uint64 _subscriptionId, 
+        bytes32 _keyHash
+    ) 
+        VRFConsumerBaseV2(_vrfCoordinator) 
+        Ownable(msg.sender) 
+    {
         vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
         subscriptionId = _subscriptionId;
         keyHash = _keyHash;
@@ -120,6 +131,7 @@ contract MultiplayerPokerTable is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
             callbackGasLimit,
             numWords
         );
+
         vrfRequestToRound[requestId] = rid;
         roundToVrfRequest[rid] = requestId;
         vrfRequestTimestamp[requestId] = block.timestamp;
@@ -154,7 +166,6 @@ contract MultiplayerPokerTable is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
         for (uint i = 0; i < winners.length; i++) {
             address w = winners[i];
             uint256 a = amounts[i];
-            // apply fee on payout? keep payout as provided but allow owner to configure houseFee
             pendingWithdrawals[t.token][w] += a;
         }
 
@@ -210,6 +221,7 @@ contract MultiplayerPokerTable is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
             callbackGasLimit,
             numWords
         );
+
         vrfRequestToRound[requestId] = roundId;
         roundToVrfRequest[roundId] = requestId;
         vrfRequestTimestamp[requestId] = block.timestamp;
