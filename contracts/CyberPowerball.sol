@@ -137,7 +137,7 @@ contract CyberPowerball is VRFConsumerBaseV2, AutomationCompatibleInterface, Own
         // Initialize prize tiers (percentages in basis points)
         // Tier 0: 5 main + PB = Jackpot (40%)
         prizeTiers[0] = PrizeTier(5, true, 4000);
-        // Tier 1: 5 main = 10%
+        // Tier 1: 5 main =     10%
         prizeTiers[1] = PrizeTier(5, false, 1000);
         // Tier 2: 4 main + PB = 5%
         prizeTiers[2] = PrizeTier(4, true, 500);
