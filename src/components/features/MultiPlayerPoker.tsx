@@ -1,5 +1,6 @@
 import { Users, Cpu, Shield, Clock, Spade, Crown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import PokerRoom from '@/components/features/PokerRoom';
 
 const seats = [
   { label: 'PLAYER 1', position: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2', isAI: false },
@@ -49,6 +50,9 @@ export default function MultiPlayerPoker() {
           and enforcing rules through smart contracts. Every deal is provably fair.
         </p>
       </div>
+
+      {/* Live multiplayer room */}
+      <PokerRoom />
 
       {/* Visual Table Diagram */}
       <div className="cyber-card p-8 md:p-12">
