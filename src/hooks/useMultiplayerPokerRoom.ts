@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   RoomState, RoomAction, createWaitingState,
   addPlayer, removePlayer, startHand, applyAction,
+  computeTimeoutAction, DefaultPref,
 } from '@/lib/poker/multiplayerEngine';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
