@@ -103,6 +103,11 @@ export default function PokerRoom() {
   }
 
   const phase = room.state.phase;
+  const timerActive = phase !== 'waiting' && phase !== 'showdown' && room.state.turnDeadline > 0;
+  const now = useNow(timerActive);
+  const secondsLeft = timerActive ? Math.max(0, Math.ceil((room.state.turnDeadline - now) / 1000)) : 0;
+  const pctLeft = timerActive ? Math.max(0, Math.min(100, ((room.state.turnDeadline - now) / TURN_MS) * 100)) : 0;
+  const turnName = room.state.players[room.state.turnSeat]?.name ?? '';
 
   return (
     <div className="space-y-4">
