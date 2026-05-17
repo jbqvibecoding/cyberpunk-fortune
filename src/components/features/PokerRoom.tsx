@@ -256,7 +256,6 @@ export default function PokerRoom() {
               </p>
             ) : (
               <>
-                <div className="text-center text-xs font-mono text-primary tracking-widest">YOUR TURN</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <Button variant="outline" className="border-destructive text-destructive" onClick={() => room.act('fold')}>FOLD</Button>
                   {canCheck ? (
