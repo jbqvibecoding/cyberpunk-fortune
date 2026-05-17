@@ -190,6 +190,7 @@
     border: 3px dashed;
   }
   .chip-gold { @apply text-background; background: linear-gradient(135deg, hsl(48 100% 55%), hsl(38 100% 45%)); border-color: hsl(48 100% 70% / 0.6); box-shadow: var(--glow-yellow); }
+  .chip-silver { @apply text-background; background: linear-gradient(135deg, hsl(0 0% 85%), hsl(0 0% 55%)); border-color: hsl(0 0% 90% / 0.6); }
   .chip-purple { @apply text-white; background: linear-gradient(135deg, hsl(267 100% 50%), hsl(280 100% 40%)); border-color: hsl(267 100% 70% / 0.6); box-shadow: var(--glow-purple); }
   .chip-cyan { @apply text-background; background: linear-gradient(135deg, hsl(187 100% 50%), hsl(200 100% 40%)); border-color: hsl(187 100% 70% / 0.6); box-shadow: var(--glow-cyan); }
 
