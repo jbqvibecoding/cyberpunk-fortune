@@ -223,6 +223,7 @@ function resolveShowdown(state: RoomState): RoomState {
     winners: winners.map(w => ({ id: w.p.id, name: w.p.name, amount: share, description: w.hand.description })),
     pot: 0,
     log: [...state.log, ...winners.map(w => `${w.p.name} wins ${share} — ${w.hand.description}`)].slice(-30),
+    turnDeadline: 0,
   };
 }
 
@@ -316,5 +317,5 @@ export function applyAction(state: RoomState, playerId: string, action: RoomActi
   }
 
   next.turnSeat = nextSeat(next, idx);
-  return next;
+  return withDeadline(next, true);
 }
