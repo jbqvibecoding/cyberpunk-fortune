@@ -383,7 +383,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     // ON-CHAIN: call quickPlay for instant result recording
     if (isOnChain) {
       const buyInWei = parseEther('0.001');
-      writeContract({
+      (writeContract as any)({
         address: CONTRACTS.SimplePoker,
         abi: SimplePokerABI,
         functionName: 'quickPlay',

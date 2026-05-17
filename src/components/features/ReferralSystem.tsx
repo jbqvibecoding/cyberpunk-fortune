@@ -49,7 +49,7 @@ export default function ReferralSystem() {
   const { data: isRegistered } = useReadContract({
     address: CONTRACTS.GameReferral,
     abi: GameReferralABI,
-    functionName: 'isReferrer',
+    functionName: 'isRegistered',
     args: address ? [address] : undefined,
     query: { enabled: isDeployed && !!address },
   });
@@ -64,7 +64,7 @@ export default function ReferralSystem() {
 
   const handleRegister = () => {
     if (!isDeployed || !isConnected) return;
-    writeContract({
+    (writeContract as any)({
       address: CONTRACTS.GameReferral,
       abi: GameReferralABI,
       functionName: 'registerAsReferrer',
@@ -73,7 +73,7 @@ export default function ReferralSystem() {
 
   const handleJoinWithReferral = () => {
     if (!isDeployed || !isConnected || !referralInput) return;
-    writeContract({
+    (writeContract as any)({
       address: CONTRACTS.GameReferral,
       abi: GameReferralABI,
       functionName: 'registerWithReferral',
