@@ -320,3 +320,14 @@ export function applyAction(state: RoomState, playerId: string, action: RoomActi
   next.turnSeat = nextSeat(next, idx);
   return withDeadline(next, true);
 }
+
+export type DefaultPref = 'check-fold' | 'call-any';
+
+export function computeTimeoutAction(state: RoomState, playerId: string, pref: DefaultPref): { action: RoomAction; amount?: number } {
+  const p = state.players.find(pl => pl.id === playerId);
+  if (!p) return { action: 'fold' };
+  const toCall = state.currentBet - p.currentBet;
+  if (toCall <= 0) return { action: 'check' };
+  if (pref === 'call-any' && p.chips > 0) return { action: 'call' };
+  return { action: 'fold' };
+}
