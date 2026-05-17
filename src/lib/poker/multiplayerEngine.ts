@@ -208,6 +208,7 @@ function resolveShowdown(state: RoomState): RoomState {
       winners: [{ id: w.id, name: w.name, amount: state.pot }],
       pot: 0,
       log: [...state.log, `${w.name} wins ${state.pot} (others folded)`].slice(-30),
+      turnDeadline: 0,
     };
   }
   const evaluated = active.map(p => ({ p, hand: evaluateHand(p.cards, state.community) }));
