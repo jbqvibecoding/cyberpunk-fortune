@@ -25,9 +25,6 @@ const Navbar = () => {
             <a href="#games" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors">
               GAMES
             </a>
-            <a href="#powerball" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors">
-              POWERBALL
-            </a>
             <a href="#poker" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors">
               POKER
             </a>
@@ -63,9 +60,6 @@ const Navbar = () => {
             <div className="flex flex-col gap-4">
               <a href="#games" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors py-2">
                 GAMES
-              </a>
-              <a href="#powerball" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors py-2">
-                POWERBALL
               </a>
               <a href="#poker" className="font-display text-sm tracking-wider text-muted-foreground hover:text-primary transition-colors py-2">
                 POKER

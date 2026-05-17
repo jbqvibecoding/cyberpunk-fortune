@@ -33,7 +33,7 @@ const HeroSection = () => {
 
           {/* Subtitle */}
           <p className="text-xl md:text-2xl text-muted-foreground font-body mb-12 max-w-2xl mx-auto animate-slide-up delay-100">
-            Provably fair lottery & AI-powered poker on the blockchain. 
+            AI-powered Texas Hold'em poker on the blockchain. 
             <span className="text-primary"> Transparent.</span>
             <span className="text-secondary"> Secure.</span>
             <span className="text-accent"> Revolutionary.</span>
