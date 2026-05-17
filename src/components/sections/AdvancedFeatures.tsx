@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Users, Gem, Gift, Globe, ChevronRight } from 'lucide-react';
+import { Users, Gift, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import MultiPlayerPoker from '@/components/features/MultiPlayerPoker';
-import NFTPasses from '@/components/features/NFTPasses';
 import ReferralSystem from '@/components/features/ReferralSystem';
 import ENSIntegration from '@/components/features/ENSIntegration';
 
@@ -16,16 +15,6 @@ const tabs = [
     bgColor: 'bg-secondary/10',
     glowClass: 'glow-magenta',
     description: 'Multiplayer poker tables with AI dealer',
-  },
-  {
-    id: 'nft-passes',
-    label: 'NFT PASSES',
-    icon: Gem,
-    color: 'text-accent',
-    borderColor: 'border-accent',
-    bgColor: 'bg-accent/10',
-    glowClass: 'glow-yellow',
-    description: 'Double Play & NoLoss game privileges',
   },
   {
     id: 'referral',
@@ -51,7 +40,6 @@ const tabs = [
 
 const featureComponents: Record<string, React.FC> = {
   multiplayer: MultiPlayerPoker,
-  'nft-passes': NFTPasses,
   referral: ReferralSystem,
   ens: ENSIntegration,
 };
@@ -78,7 +66,7 @@ export default function AdvancedFeatures() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-4xl mx-auto mb-10">
           {tabs.map((tab) => (
             <button
               key={tab.id}
