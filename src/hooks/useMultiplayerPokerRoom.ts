@@ -106,7 +106,7 @@ export function useMultiplayerPokerRoom(): UseRoomResult {
       const current = stateRef.current;
       if (current.phase !== 'waiting') return;
       let next = current;
-      for (const p of leftPresences as { id: string }[]) {
+      for (const p of leftPresences as unknown as { id: string }[]) {
         next = removePlayer(next, p.id);
       }
       if (next !== current) {
