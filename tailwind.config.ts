@@ -15,7 +15,7 @@ export default {
     extend: {
       fontFamily: {
         display: ['Orbitron', 'sans-serif'],
-        body: ['Rajdhani', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
         mono: ['Share Tech Mono', 'monospace'],
       },
       colors: {
@@ -57,6 +57,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         neon: {
+          purple: "hsl(var(--neon-purple))",
           cyan: "hsl(var(--neon-cyan))",
           magenta: "hsl(var(--neon-magenta))",
           yellow: "hsl(var(--neon-yellow))",
@@ -120,8 +121,9 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
       },
       backgroundImage: {
-        "cyber-gradient": "linear-gradient(135deg, hsl(185 100% 50% / 0.1), hsl(300 100% 50% / 0.1))",
-        "neon-gradient": "linear-gradient(90deg, hsl(185 100% 50%), hsl(300 100% 50%))",
+        "cyber-gradient": "linear-gradient(135deg, hsl(267 100% 50% / 0.12), hsl(187 100% 50% / 0.12))",
+        "neon-gradient": "linear-gradient(90deg, hsl(267 100% 50%), hsl(311 100% 59%), hsl(187 100% 50%))",
+        "purple-gradient": "linear-gradient(135deg, hsl(267 100% 50%), hsl(311 100% 59%))",
       },
     },
   },
