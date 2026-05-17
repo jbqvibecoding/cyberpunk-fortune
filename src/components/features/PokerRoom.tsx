@@ -4,10 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { PlayingCard } from '@/components/games/poker/PlayingCard';
-import { Copy, LogOut, Users, Crown, Check } from 'lucide-react';
+import { Copy, LogOut, Crown, Check, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { RoomPlayer } from '@/lib/poker/multiplayerEngine';
+import { TURN_MS } from '@/lib/poker/multiplayerEngine';
+
+function useNow(active: boolean) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
 
 export default function PokerRoom() {
   const room = useMultiplayerPokerRoom();
