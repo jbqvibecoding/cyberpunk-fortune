@@ -4,10 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { PlayingCard } from '@/components/games/poker/PlayingCard';
-import { Copy, LogOut, Users, Crown, Check } from 'lucide-react';
+import { Copy, LogOut, Crown, Check, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { RoomPlayer } from '@/lib/poker/multiplayerEngine';
+import { TURN_MS } from '@/lib/poker/multiplayerEngine';
+
+function useNow(active: boolean) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
 
 export default function PokerRoom() {
   const room = useMultiplayerPokerRoom();
@@ -92,6 +103,11 @@ export default function PokerRoom() {
   }
 
   const phase = room.state.phase;
+  const timerActive = phase !== 'waiting' && phase !== 'showdown' && room.state.turnDeadline > 0;
+  const now = useNow(timerActive);
+  const secondsLeft = timerActive ? Math.max(0, Math.ceil((room.state.turnDeadline - now) / 1000)) : 0;
+  const pctLeft = timerActive ? Math.max(0, Math.min(100, ((room.state.turnDeadline - now) / TURN_MS) * 100)) : 0;
+  const turnName = room.state.players[room.state.turnSeat]?.name ?? '';
 
   return (
     <div className="space-y-4">
@@ -146,7 +162,7 @@ export default function PokerRoom() {
         {/* Players */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {room.state.players.map(p => (
-            <PlayerSeat key={p.id} player={p} state={room.state} meId={room.identity.id} present={room.presentIds.includes(p.id)} />
+            <PlayerSeat key={p.id} player={p} state={room.state} meId={room.identity.id} present={room.presentIds.includes(p.id)} secondsLeft={p.seat === room.state.turnSeat ? secondsLeft : undefined} />
           ))}
           {Array.from({ length: Math.max(0, 6 - room.state.players.length) }).map((_, i) => (
             <div key={`empty-${i}`} className="border border-dashed border-muted-foreground/20 rounded-lg p-3 text-center text-xs text-muted-foreground/50 font-mono">
@@ -190,15 +206,56 @@ export default function PokerRoom() {
 
         {phase !== 'waiting' && phase !== 'showdown' && (
           <div className="space-y-3">
+            {/* Turn timer */}
+            {timerActive && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Timer className="h-3 w-3" /> {isMyTurn ? 'YOUR TURN' : `${turnName}'S TURN`}
+                  </span>
+                  <span className={cn(secondsLeft <= 5 ? 'text-destructive' : 'text-primary')}>
+                    {secondsLeft}s
+                  </span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted/30 overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full transition-[width] duration-200',
+                      secondsLeft <= 5 ? 'bg-destructive' : 'bg-primary'
+                    )}
+                    style={{ width: `${pctLeft}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Default-action picker (always visible) */}
+            <div className="flex items-center justify-center gap-2 text-xs font-mono">
+              <span className="text-muted-foreground">ON TIMEOUT:</span>
+              {(['check-fold', 'call-any'] as const).map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => room.setDefaultPref(opt)}
+                  className={cn(
+                    'px-2 py-1 rounded border transition-colors',
+                    room.defaultPref === opt
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground'
+                  )}
+                >
+                  {opt === 'check-fold' ? 'CHECK / FOLD' : 'CALL ANY'}
+                </button>
+              ))}
+            </div>
+
             {!me ? (
               <p className="text-center text-sm text-muted-foreground">Spectating — wait for the next hand to be seated.</p>
             ) : !isMyTurn ? (
               <p className="text-center text-sm text-muted-foreground">
-                Locked — waiting for {room.state.players[room.state.turnSeat]?.name} to act...
+                Locked — waiting for {turnName} to act...
               </p>
             ) : (
               <>
-                <div className="text-center text-xs font-mono text-primary tracking-widest">YOUR TURN</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <Button variant="outline" className="border-destructive text-destructive" onClick={() => room.act('fold')}>FOLD</Button>
                   {canCheck ? (
@@ -253,11 +310,12 @@ export default function PokerRoom() {
   );
 }
 
-function PlayerSeat({ player, state, meId, present }: {
+function PlayerSeat({ player, state, meId, present, secondsLeft }: {
   player: RoomPlayer;
   state: ReturnType<typeof useMultiplayerPokerRoom>['state'];
   meId: string;
   present: boolean;
+  secondsLeft?: number;
 }) {
   const isMe = player.id === meId;
   const isTurn = player.seat === state.turnSeat && state.phase !== 'waiting' && state.phase !== 'showdown';
@@ -277,7 +335,11 @@ function PlayerSeat({ player, state, meId, present }: {
           {isMe && <span className="text-[10px] text-primary font-mono">(YOU)</span>}
           {isDealer && <span className="text-[10px] text-accent font-mono">D</span>}
         </div>
-        {player.hasActed && !player.hasFolded && <Check className="h-3 w-3 text-success" />}
+        {isTurn && secondsLeft !== undefined ? (
+          <span className={cn('text-[10px] font-mono px-1.5 py-0.5 rounded', secondsLeft <= 5 ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary')}>
+            {secondsLeft}s
+          </span>
+        ) : (player.hasActed && !player.hasFolded && <Check className="h-3 w-3 text-success" />)}
       </div>
       <div className="flex gap-1 mb-2 min-h-[3.5rem]">
         {player.cards.length > 0 ? (

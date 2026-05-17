@@ -35,11 +35,17 @@ export interface RoomState {
   bigBlind: number;
   winners: { id: string; name: string; amount: number; description?: string }[];
   log: string[];
+  turnDeadline: number; // epoch ms; 0 when no active turn
 }
 
 const START_CHIPS = 1000;
 const SB = 10;
 const BB = 20;
+export const TURN_MS = 30000;
+
+function withDeadline<T extends RoomState>(s: T, active: boolean): T {
+  return { ...s, turnDeadline: active ? Date.now() + TURN_MS : 0 };
+}
 
 export function createWaitingState(): RoomState {
   return {
@@ -57,6 +63,7 @@ export function createWaitingState(): RoomState {
     bigBlind: BB,
     winners: [],
     log: ['Room created. Waiting for players...'],
+    turnDeadline: 0,
   };
 }
 
@@ -126,10 +133,10 @@ export function startHand(state: RoomState): RoomState {
 
   const turnSeat = (bbSeat + 1) % n;
 
-  return {
+  return withDeadline({
     ...state,
     version: state.version + 1,
-    phase: 'preflop',
+    phase: 'preflop' as const,
     players,
     community: [],
     deck: d,
@@ -140,7 +147,8 @@ export function startHand(state: RoomState): RoomState {
     dealerSeat,
     winners: [],
     log: [...state.log, `--- New hand --- Dealer: ${players[dealerSeat].name}`].slice(-30),
-  };
+    turnDeadline: 0,
+  }, true);
 }
 
 function activePlayers(state: RoomState): RoomPlayer[] {
@@ -186,7 +194,7 @@ function advancePhase(state: RoomState): RoomState {
   s.deck = d;
   s.turnSeat = nextSeat(s, s.dealerSeat);
   s.log = [...s.log, `>> ${s.phase.toUpperCase()}`].slice(-30);
-  return s;
+  return withDeadline(s, true);
 }
 
 function resolveShowdown(state: RoomState): RoomState {
@@ -200,6 +208,7 @@ function resolveShowdown(state: RoomState): RoomState {
       winners: [{ id: w.id, name: w.name, amount: state.pot }],
       pot: 0,
       log: [...state.log, `${w.name} wins ${state.pot} (others folded)`].slice(-30),
+      turnDeadline: 0,
     };
   }
   const evaluated = active.map(p => ({ p, hand: evaluateHand(p.cards, state.community) }));
@@ -215,6 +224,7 @@ function resolveShowdown(state: RoomState): RoomState {
     winners: winners.map(w => ({ id: w.p.id, name: w.p.name, amount: share, description: w.hand.description })),
     pot: 0,
     log: [...state.log, ...winners.map(w => `${w.p.name} wins ${share} — ${w.hand.description}`)].slice(-30),
+    turnDeadline: 0,
   };
 }
 
@@ -308,5 +318,16 @@ export function applyAction(state: RoomState, playerId: string, action: RoomActi
   }
 
   next.turnSeat = nextSeat(next, idx);
-  return next;
+  return withDeadline(next, true);
+}
+
+export type DefaultPref = 'check-fold' | 'call-any';
+
+export function computeTimeoutAction(state: RoomState, playerId: string, pref: DefaultPref): { action: RoomAction; amount?: number } {
+  const p = state.players.find(pl => pl.id === playerId);
+  if (!p) return { action: 'fold' };
+  const toCall = state.currentBet - p.currentBet;
+  if (toCall <= 0) return { action: 'check' };
+  if (pref === 'call-any' && p.chips > 0) return { action: 'call' };
+  return { action: 'fold' };
 }
