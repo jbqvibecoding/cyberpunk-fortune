@@ -133,10 +133,10 @@ export function startHand(state: RoomState): RoomState {
 
   const turnSeat = (bbSeat + 1) % n;
 
-  return {
+  return withDeadline({
     ...state,
     version: state.version + 1,
-    phase: 'preflop',
+    phase: 'preflop' as const,
     players,
     community: [],
     deck: d,
@@ -147,7 +147,8 @@ export function startHand(state: RoomState): RoomState {
     dealerSeat,
     winners: [],
     log: [...state.log, `--- New hand --- Dealer: ${players[dealerSeat].name}`].slice(-30),
-  };
+    turnDeadline: 0,
+  }, true);
 }
 
 function activePlayers(state: RoomState): RoomPlayer[] {
@@ -193,7 +194,7 @@ function advancePhase(state: RoomState): RoomState {
   s.deck = d;
   s.turnSeat = nextSeat(s, s.dealerSeat);
   s.log = [...s.log, `>> ${s.phase.toUpperCase()}`].slice(-30);
-  return s;
+  return withDeadline(s, true);
 }
 
 function resolveShowdown(state: RoomState): RoomState {
