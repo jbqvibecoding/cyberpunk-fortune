@@ -162,7 +162,7 @@ export default function PokerRoom() {
         {/* Players */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {room.state.players.map(p => (
-            <PlayerSeat key={p.id} player={p} state={room.state} meId={room.identity.id} present={room.presentIds.includes(p.id)} />
+            <PlayerSeat key={p.id} player={p} state={room.state} meId={room.identity.id} present={room.presentIds.includes(p.id)} secondsLeft={p.seat === room.state.turnSeat ? secondsLeft : undefined} />
           ))}
           {Array.from({ length: Math.max(0, 6 - room.state.players.length) }).map((_, i) => (
             <div key={`empty-${i}`} className="border border-dashed border-muted-foreground/20 rounded-lg p-3 text-center text-xs text-muted-foreground/50 font-mono">
@@ -310,11 +310,12 @@ export default function PokerRoom() {
   );
 }
 
-function PlayerSeat({ player, state, meId, present }: {
+function PlayerSeat({ player, state, meId, present, secondsLeft }: {
   player: RoomPlayer;
   state: ReturnType<typeof useMultiplayerPokerRoom>['state'];
   meId: string;
   present: boolean;
+  secondsLeft?: number;
 }) {
   const isMe = player.id === meId;
   const isTurn = player.seat === state.turnSeat && state.phase !== 'waiting' && state.phase !== 'showdown';
@@ -334,7 +335,11 @@ function PlayerSeat({ player, state, meId, present }: {
           {isMe && <span className="text-[10px] text-primary font-mono">(YOU)</span>}
           {isDealer && <span className="text-[10px] text-accent font-mono">D</span>}
         </div>
-        {player.hasActed && !player.hasFolded && <Check className="h-3 w-3 text-success" />}
+        {isTurn && secondsLeft !== undefined ? (
+          <span className={cn('text-[10px] font-mono px-1.5 py-0.5 rounded', secondsLeft <= 5 ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary')}>
+            {secondsLeft}s
+          </span>
+        ) : (player.hasActed && !player.hasFolded && <Check className="h-3 w-3 text-success" />)}
       </div>
       <div className="flex gap-1 mb-2 min-h-[3.5rem]">
         {player.cards.length > 0 ? (
