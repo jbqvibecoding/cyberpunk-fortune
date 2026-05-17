@@ -35,11 +35,17 @@ export interface RoomState {
   bigBlind: number;
   winners: { id: string; name: string; amount: number; description?: string }[];
   log: string[];
+  turnDeadline: number; // epoch ms; 0 when no active turn
 }
 
 const START_CHIPS = 1000;
 const SB = 10;
 const BB = 20;
+export const TURN_MS = 30000;
+
+function withDeadline<T extends RoomState>(s: T, active: boolean): T {
+  return { ...s, turnDeadline: active ? Date.now() + TURN_MS : 0 };
+}
 
 export function createWaitingState(): RoomState {
   return {
@@ -57,6 +63,7 @@ export function createWaitingState(): RoomState {
     bigBlind: BB,
     winners: [],
     log: ['Room created. Waiting for players...'],
+    turnDeadline: 0,
   };
 }
 
