@@ -1,11 +1,12 @@
 import { GameState } from '@/lib/poker/types';
 import { PlayingCard } from './PlayingCard';
-import { ChipStack } from './ChipStack';
 import { Cpu, User, Clock, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { AIAgent } from '@/lib/agents';
 
 interface PokerTableProps {
   state: GameState;
+  agent?: AIAgent;
 }
 
 const phaseNames: Record<string, string> = {
@@ -18,209 +19,208 @@ const phaseNames: Record<string, string> = {
   'finished': 'FINISHED',
 };
 
-export function PokerTable({ state }: PokerTableProps) {
+export function PokerTable({ state, agent }: PokerTableProps) {
   const playerData = state.players.find(p => !p.isAI);
   const aiData = state.players.find(p => p.isAI);
   const isShowdown = state.phase === 'showdown' || state.phase === 'finished';
   const currentPlayer = state.players[state.currentPlayerIndex];
-
-  // Determine dealer button position
   const dealerPlayer = state.players.find(p => p.isDealer);
   const isDealerAI = dealerPlayer?.isAI;
+  const aiActive = currentPlayer?.isAI && state.phase !== 'finished' && state.phase !== 'showdown';
+  const youActive = currentPlayer && !currentPlayer.isAI && state.phase !== 'finished' && state.phase !== 'showdown';
 
   return (
-    <div className="cyber-card p-6 md:p-8 relative overflow-hidden">
-      {/* Phase indicator */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2">
-        <Clock className="h-4 w-4 text-muted-foreground" />
-        <span className="font-mono text-sm">{phaseNames[state.phase]}</span>
+    <div className="cyber-card-neon p-4 md:p-6 relative overflow-hidden">
+      {/* Phase HUD */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-background/80 backdrop-blur-sm rounded-md px-3 py-1.5 border border-secondary/40">
+        <Clock className="h-3.5 w-3.5 text-secondary" />
+        <span className="font-mono text-xs tracking-widest text-secondary">{phaseNames[state.phase]}</span>
       </div>
 
-      {/* AI Commentary */}
+      {/* AI commentary */}
       {state.aiCommentary && (
-        <div className="absolute top-4 left-4 bg-secondary/20 backdrop-blur-sm rounded-lg px-3 py-2 max-w-[200px] border border-secondary/30">
+        <div className="absolute top-4 left-4 z-20 bg-accent/15 backdrop-blur-sm rounded-md px-3 py-2 max-w-[220px] border border-accent/40">
           <div className="flex items-start gap-2">
-            <MessageCircle className="h-4 w-4 text-secondary shrink-0 mt-0.5" />
-            <span className="text-xs text-secondary italic">"{state.aiCommentary}"</span>
+            <MessageCircle className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
+            <span className="text-xs text-accent italic">"{state.aiCommentary}"</span>
           </div>
         </div>
       )}
 
-      {/* Table Surface */}
-      <div className="relative bg-gradient-to-b from-success/20 to-success/5 rounded-[80px] md:rounded-[100px] p-6 md:p-8 border border-success/30 min-h-[400px]">
-        
-        {/* AI Opponent */}
-        <div className="flex justify-center mb-6">
+      {/* Felt */}
+      <div className="poker-felt relative rounded-[80px] md:rounded-[120px] px-6 py-10 md:px-10 md:py-12 border border-primary/30 min-h-[420px]">
+        {/* AI seat */}
+        <div className="flex justify-center mb-6 relative z-10">
           <div className="text-center relative">
-            {/* Dealer Button for AI */}
-            {isDealerAI && (
-              <div className="absolute -left-8 top-4">
-                <div className="w-8 h-8 rounded-full bg-accent border-2 border-accent-foreground flex items-center justify-center shadow-lg">
-                  <span className="font-display text-xs font-bold text-accent-foreground">D</span>
-                </div>
+            {isDealerAI && <DealerChip className="-left-10 top-6" />}
+            <div className="relative inline-block">
+              <div className={cn(
+                'relative w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border-2 mx-auto transition-all',
+                aiActive ? 'border-accent animate-glow-breathe' : 'border-accent/50'
+              )}>
+                {agent ? (
+                  <img src={agent.portrait} alt={agent.name} className="w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="w-full h-full bg-accent/15 flex items-center justify-center">
+                    <Cpu className="h-10 w-10 text-accent" />
+                  </div>
+                )}
+                {aiActive && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute inset-0 rounded-2xl border-2 border-accent animate-ripple" />
+                  </div>
+                )}
               </div>
-            )}
-            
-            <div className={cn(
-              'w-16 h-16 md:w-20 md:h-20 rounded-full border-2 flex items-center justify-center mb-2 mx-auto transition-all',
-              currentPlayer?.isAI && state.phase !== 'finished' && state.phase !== 'showdown'
-                ? 'bg-secondary/20 border-secondary glow-magenta animate-pulse'
-                : 'bg-secondary/10 border-secondary/50'
-            )}>
-              <Cpu className="h-8 w-8 md:h-10 md:w-10 text-secondary" />
+              <div className="mt-2 font-display text-sm text-accent tracking-wider">
+                {agent?.name ?? 'AI OPPONENT'}
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground tracking-widest">
+                CHIPS · <span className="text-accent">{aiData?.chips ?? 0}</span>
+              </div>
             </div>
-            <span className="font-display text-sm text-secondary">AI OPPONENT</span>
-            <div className="font-mono text-xs text-muted-foreground mt-1">
-              Chips: {aiData?.chips || 0}
-            </div>
-            
-            {/* AI Thinking Indicator */}
+
             {state.aiThinking && (
               <div className="mt-2 flex items-center justify-center gap-1">
-                <div className="w-2 h-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             )}
-            
+
             {aiData && aiData.currentBet > 0 && (
-              <div className="mt-2">
-                <ChipStack amount={aiData.currentBet} variant="silver" />
+              <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent/15 border border-accent/40 animate-chip-pop">
+                <span className="w-2 h-2 rounded-full bg-accent" />
+                <span className="font-mono text-xs text-accent">BET {aiData.currentBet}</span>
               </div>
             )}
-            
+
             {/* AI Cards */}
             <div className="flex gap-2 justify-center mt-3">
               {aiData?.cards.map((card, i) => (
-                <PlayingCard 
-                  key={i} 
-                  card={card}
-                  faceDown={!isShowdown}
-                  size="md"
-                  highlight={isShowdown && state.winner?.isAI}
-                />
+                <div key={i} className="animate-card-deal" style={{ animationDelay: `${i * 120}ms` }}>
+                  <PlayingCard card={card} faceDown={!isShowdown} size="md" highlight={isShowdown && state.winner?.isAI} />
+                </div>
               ))}
-              {(!aiData?.cards.length || aiData.cards.length === 0) && state.phase !== 'waiting' && (
+              {(!aiData?.cards.length) && state.phase !== 'waiting' && (
                 <>
                   <PlayingCard faceDown size="md" />
                   <PlayingCard faceDown size="md" />
                 </>
               )}
             </div>
-            
-            {aiData?.hasFolded && (
-              <span className="text-destructive text-sm mt-2 block font-bold">FOLDED</span>
-            )}
+
+            {aiData?.hasFolded && <span className="block mt-2 text-destructive text-xs font-display tracking-widest">FOLDED</span>}
             {aiData?.isAllIn && !aiData?.hasFolded && (
-              <span className="text-accent text-sm mt-2 block font-bold animate-pulse">ALL-IN!</span>
+              <span className="block mt-2 text-accent text-xs font-display tracking-widest animate-neon-flicker">ALL-IN</span>
             )}
           </div>
         </div>
 
-        {/* Community Cards */}
-        <div className="flex justify-center gap-2 md:gap-3 my-6 md:my-8">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className={cn(
-              "transition-all duration-300",
-              state.communityCards[i] ? "opacity-100 scale-100" : "opacity-30 scale-95"
-            )}>
-              <PlayingCard
-                card={state.communityCards[i]}
-                faceDown={!state.communityCards[i]}
-                size="md"
-              />
+        {/* Community cards */}
+        <div className="flex justify-center gap-2 md:gap-3 my-6 md:my-8 relative z-10">
+          {[0, 1, 2, 3, 4].map(i => (
+            <div
+              key={i}
+              className={cn(
+                'transition-all duration-300',
+                state.communityCards[i] ? 'animate-card-deal' : 'opacity-30'
+              )}
+              style={state.communityCards[i] ? { animationDelay: `${i * 100}ms` } : undefined}
+            >
+              <PlayingCard card={state.communityCards[i]} faceDown={!state.communityCards[i]} size="md" />
             </div>
           ))}
         </div>
 
-        {/* Pot Display */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <ChipStack amount={state.pot} label="POT" variant="gold" />
+        {/* Pot */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+          <div className="flex flex-col items-center gap-1">
+            <div className="chip chip-purple animate-pulse-glow">
+              <span className="text-[10px] font-display">POT</span>
+            </div>
+            <span className="font-mono text-sm text-primary text-glow-purple">{state.pot}</span>
+          </div>
         </div>
 
-        {/* Player */}
-        <div className="flex justify-center mt-6">
+        {/* Player seat */}
+        <div className="flex justify-center mt-8 relative z-10">
           <div className="text-center relative">
-            {/* Dealer Button for Player */}
-            {!isDealerAI && dealerPlayer && (
-              <div className="absolute -left-8 top-4">
-                <div className="w-8 h-8 rounded-full bg-accent border-2 border-accent-foreground flex items-center justify-center shadow-lg">
-                  <span className="font-display text-xs font-bold text-accent-foreground">D</span>
-                </div>
-              </div>
-            )}
-            
-            {/* Player Cards */}
+            {!isDealerAI && dealerPlayer && <DealerChip className="-left-10 top-1" />}
+
             <div className="flex gap-2 justify-center mb-3">
               {playerData?.cards.map((card, i) => (
-                <PlayingCard 
-                  key={i} 
-                  card={card}
-                  size="md"
-                  highlight={state.phase === 'finished' && state.winner?.id === 'player'}
-                />
+                <div key={i} className="animate-card-deal" style={{ animationDelay: `${i * 120 + 240}ms` }}>
+                  <PlayingCard card={card} size="md" highlight={state.phase === 'finished' && state.winner?.id === 'player'} />
+                </div>
               ))}
-              {(!playerData?.cards.length || playerData.cards.length === 0) && state.phase !== 'waiting' && (
+              {(!playerData?.cards.length) && state.phase !== 'waiting' && (
                 <>
                   <PlayingCard faceDown size="md" />
                   <PlayingCard faceDown size="md" />
                 </>
               )}
             </div>
-            
+
             {playerData && playerData.currentBet > 0 && (
-              <div className="mb-2">
-                <ChipStack amount={playerData.currentBet} variant="primary" />
+              <div className="mb-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/15 border border-secondary/40 animate-chip-pop">
+                <span className="w-2 h-2 rounded-full bg-secondary" />
+                <span className="font-mono text-xs text-secondary">BET {playerData.currentBet}</span>
               </div>
             )}
-            
+
             <div className={cn(
-              'w-16 h-16 md:w-20 md:h-20 rounded-full border-2 flex items-center justify-center mb-2 mx-auto transition-all',
-              currentPlayer && !currentPlayer.isAI && state.phase !== 'finished' && state.phase !== 'showdown'
-                ? 'bg-primary/20 border-primary glow-cyan'
-                : 'bg-primary/10 border-primary/50'
+              'relative w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border-2 mx-auto transition-all bg-secondary/10 flex items-center justify-center',
+              youActive ? 'border-secondary animate-glow-breathe' : 'border-secondary/50'
             )}>
-              <User className="h-8 w-8 md:h-10 md:w-10 text-primary" />
+              <User className="h-10 w-10 text-secondary" />
+              {youActive && (
+                <div className="absolute inset-0 rounded-2xl border-2 border-secondary animate-ripple pointer-events-none" />
+              )}
             </div>
-            <span className="font-display text-sm text-primary">YOU</span>
-            <div className="font-mono text-xs text-muted-foreground mt-1">
-              Chips: {playerData?.chips || 0}
+            <div className="mt-2 font-display text-sm text-secondary tracking-wider">YOU</div>
+            <div className="font-mono text-[10px] text-muted-foreground tracking-widest">
+              CHIPS · <span className="text-secondary">{playerData?.chips ?? 0}</span>
             </div>
-            
-            {playerData?.hasFolded && (
-              <span className="text-destructive text-sm mt-2 block font-bold">FOLDED</span>
-            )}
+
+            {playerData?.hasFolded && <span className="block mt-2 text-destructive text-xs font-display tracking-widest">FOLDED</span>}
             {playerData?.isAllIn && !playerData?.hasFolded && (
-              <span className="text-accent text-sm mt-2 block font-bold animate-pulse">ALL-IN!</span>
+              <span className="block mt-2 text-accent text-xs font-display tracking-widest animate-neon-flicker">ALL-IN</span>
             )}
           </div>
         </div>
 
-        {/* Showdown Indicator */}
+        {/* Showdown overlay */}
         {state.phase === 'showdown' && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="bg-background/80 backdrop-blur-sm rounded-lg px-6 py-3 border border-accent animate-pulse">
-              <span className="font-display text-xl text-accent">SHOWDOWN!</span>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            <div className="bg-background/85 backdrop-blur rounded-lg px-8 py-3 border-2 border-accent animate-glow-breathe">
+              <span className="font-display text-2xl text-accent text-glow-magenta tracking-widest">SHOWDOWN</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Last Action Display */}
+      {/* Last action */}
       {state.lastAction && (
-        <div className="mt-4 text-center">
-          <span className="text-sm text-muted-foreground">
-            <span className={state.lastAction.player === 'YOU' ? 'text-primary' : 'text-secondary'}>
-              {state.lastAction.player}
-            </span>
-            {': '}
-            <span className="font-mono uppercase text-foreground">
-              {state.lastAction.action}
-              {state.lastAction.amount && ` ${state.lastAction.amount}`}
-            </span>
+        <div className="mt-4 text-center font-mono text-xs">
+          <span className={state.lastAction.player === 'YOU' ? 'text-secondary' : 'text-accent'}>
+            {state.lastAction.player}
+          </span>
+          <span className="text-muted-foreground"> → </span>
+          <span className="uppercase text-foreground tracking-widest">
+            {state.lastAction.action}{state.lastAction.amount ? ` ${state.lastAction.amount}` : ''}
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+function DealerChip({ className }: { className?: string }) {
+  return (
+    <div className={cn('absolute z-10', className)}>
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[hsl(48,100%,60%)] to-[hsl(38,100%,45%)] border-2 border-[hsl(48,100%,80%)] flex items-center justify-center shadow-[0_0_14px_hsl(48,100%,55%,0.7)] animate-spin-slow">
+        <span className="font-display text-[10px] font-bold text-background">D</span>
+      </div>
     </div>
   );
 }

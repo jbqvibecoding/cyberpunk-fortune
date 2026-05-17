@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GameState, GameActions } from '@/lib/poker/types';
-import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { Hand, Check, Coins, Zap, Play } from 'lucide-react';
 
 interface BettingControlsProps {
   state: GameState;
@@ -12,73 +12,43 @@ interface BettingControlsProps {
 
 export function BettingControls({ state, actions, className }: BettingControlsProps) {
   const [raiseAmount, setRaiseAmount] = useState(state.bigBlind * 2);
-  
   const currentPlayer = state.players[state.currentPlayerIndex];
   const isPlayerTurn = currentPlayer && !currentPlayer.isAI;
   const callAmount = state.currentBet - (currentPlayer?.currentBet || 0);
   const canCheck = callAmount === 0;
-  const minRaise = state.bigBlind;
+  const minRaise = Math.max(state.bigBlind, state.currentBet + state.bigBlind);
   const maxRaise = currentPlayer?.chips || 0;
+
+  useEffect(() => {
+    setRaiseAmount(Math.min(maxRaise, Math.max(minRaise, state.bigBlind * 2)));
+  }, [state.currentPlayerIndex, state.currentBet, minRaise, maxRaise, state.bigBlind]);
 
   if (state.phase === 'waiting') {
     return (
       <div className={cn('flex justify-center', className)}>
-        <Button 
-          onClick={actions.startGame}
-          className="cyber-btn-primary text-lg px-8 py-6"
-        >
-          START GAME
-        </Button>
-      </div>
-    );
-  }
-
-  if (state.phase === 'finished') {
-    return (
-      <div className={cn('flex flex-col items-center gap-4', className)}>
-        <div className="text-center">
-          {state.winner && (
-            <div className="mb-4">
-              <span className={cn(
-                'font-display text-2xl',
-                state.winner.isAI ? 'text-secondary' : 'text-primary'
-              )}>
-                {state.winner.name} wins {state.pot} chips!
-              </span>
-              {state.winningHand && (
-                <p className="text-muted-foreground mt-2">
-                  {state.winningHand.description}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-        <Button 
-          onClick={actions.resetGame}
-          className="cyber-btn-primary"
-        >
-          NEXT HAND
-        </Button>
+        <button onClick={actions.startGame} className="cyber-btn-primary text-base animate-glow-breathe">
+          <Play className="h-4 w-4" /> START GAME
+        </button>
       </div>
     );
   }
 
   if (!isPlayerTurn || state.aiThinking) {
     return (
-      <div className={cn('flex justify-center items-center gap-2', className)}>
-        <div className="animate-pulse">
-          <span className="font-display text-secondary">AI THINKING...</span>
-        </div>
+      <div className={cn('flex justify-center items-center gap-3 py-6', className)}>
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inset-0 rounded-full bg-accent animate-ripple" />
+          <span className="rounded-full h-2 w-2 bg-accent" />
+        </span>
+        <span className="font-display text-accent tracking-widest text-glow-magenta">AI THINKING...</span>
       </div>
     );
   }
 
   if (currentPlayer.hasFolded || currentPlayer.isAllIn) {
     return (
-      <div className={cn('flex justify-center', className)}>
-        <span className="text-muted-foreground">
-          {currentPlayer.hasFolded ? 'FOLDED' : 'ALL-IN'}
-        </span>
+      <div className={cn('flex justify-center py-4 font-display tracking-widest text-muted-foreground', className)}>
+        {currentPlayer.hasFolded ? 'FOLDED' : 'ALL-IN'}
       </div>
     );
   }
@@ -86,67 +56,57 @@ export function BettingControls({ state, actions, className }: BettingControlsPr
   return (
     <div className={cn('space-y-4', className)}>
       {/* Raise slider */}
-      <div className="bg-card/50 rounded-lg p-4">
-        <div className="flex justify-between mb-2">
-          <span className="text-sm text-muted-foreground">Raise Amount</span>
-          <span className="font-mono text-primary">{raiseAmount}</span>
+      <div className="rounded-lg p-4 bg-primary/5 border border-primary/20">
+        <div className="flex justify-between mb-2 font-mono text-xs">
+          <span className="text-muted-foreground tracking-widest">RAISE AMOUNT</span>
+          <span className="text-primary text-glow-purple font-bold">{raiseAmount}</span>
         </div>
         <Slider
           value={[raiseAmount]}
-          onValueChange={([value]) => setRaiseAmount(value)}
+          onValueChange={([v]) => setRaiseAmount(v)}
           min={minRaise}
           max={maxRaise}
           step={state.bigBlind}
           className="mb-2"
         />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{minRaise}</span>
-          <span>{maxRaise}</span>
+        <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+          <span>MIN {minRaise}</span>
+          <span>MAX {maxRaise}</span>
         </div>
       </div>
 
       {/* Action buttons */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Button
-          variant="outline"
-          onClick={actions.fold}
-          className="border-destructive text-destructive hover:bg-destructive/10"
-        >
-          FOLD
-        </Button>
-        
+        <button onClick={actions.fold} className="cyber-btn bg-transparent border-2 border-destructive text-destructive hover:bg-destructive/10 hover:shadow-[0_0_18px_hsl(0,85%,60%,0.5)]">
+          <Hand className="h-4 w-4" /> FOLD
+        </button>
+
         {canCheck ? (
-          <Button
-            variant="outline"
-            onClick={actions.check}
-            className="border-muted-foreground"
-          >
-            CHECK
-          </Button>
+          <button onClick={actions.check} className="cyber-btn-ghost">
+            <Check className="h-4 w-4" /> CHECK
+          </button>
         ) : (
-          <Button
-            variant="outline"
-            onClick={actions.call}
-            className="border-primary text-primary"
-          >
-            CALL {callAmount}
-          </Button>
+          <button onClick={actions.call} className="cyber-btn-neon">
+            <Coins className="h-4 w-4" /> CALL {Math.min(callAmount, maxRaise)}
+          </button>
         )}
-        
-        <Button
+
+        <button
           onClick={() => actions.raise(raiseAmount)}
-          className="bg-accent hover:bg-accent/90 text-accent-foreground"
-          disabled={raiseAmount > maxRaise}
+          disabled={raiseAmount > maxRaise || maxRaise < minRaise}
+          className="cyber-btn text-white disabled:opacity-50"
+          style={{ background: 'linear-gradient(135deg, hsl(311 100% 55%), hsl(267 100% 55%))', boxShadow: '0 0 18px hsl(311 100% 55% / 0.45)' }}
         >
-          RAISE {raiseAmount}
-        </Button>
-        
-        <Button
+          <Zap className="h-4 w-4" /> RAISE {raiseAmount}
+        </button>
+
+        <button
           onClick={actions.allIn}
-          className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+          className="cyber-btn text-background animate-pulse-glow"
+          style={{ background: 'linear-gradient(135deg, hsl(48 100% 55%), hsl(38 100% 45%))', boxShadow: 'var(--glow-yellow)' }}
         >
           ALL-IN {currentPlayer.chips}
-        </Button>
+        </button>
       </div>
     </div>
   );
