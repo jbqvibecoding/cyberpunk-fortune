@@ -135,6 +135,12 @@ export function useMultiplayerPokerRoom(): UseRoomResult {
       }
     });
 
+    channel.on('broadcast', { event: 'pref' }, ({ payload }) => {
+      if (!isHostRef.current) return;
+      const { playerId, pref } = payload as { playerId: string; pref: DefaultPref };
+      prefsRef.current[playerId] = pref;
+    });
+
     channel.on('broadcast', { event: 'request-state' }, () => {
       if (isHostRef.current) broadcastState(stateRef.current);
     });
@@ -214,6 +220,43 @@ export function useMultiplayerPokerRoom(): UseRoomResult {
 
   useEffect(() => () => teardown(), [teardown]);
 
+  // Broadcast my pref to host when it changes or when channel comes online
+  useEffect(() => {
+    prefsRef.current[identity.id] = defaultPref;
+    if (connected) {
+      channelRef.current?.send({
+        type: 'broadcast', event: 'pref',
+        payload: { playerId: identity.id, pref: defaultPref },
+      });
+    }
+  }, [defaultPref, connected, identity.id]);
+
+  // Host-side timeout enforcement
+  useEffect(() => {
+    if (!isHost) return;
+    const id = setInterval(() => {
+      const s = stateRef.current;
+      if (s.phase === 'waiting' || s.phase === 'showdown') return;
+      if (!s.turnDeadline || Date.now() < s.turnDeadline) return;
+      const current = s.players[s.turnSeat];
+      if (!current || current.hasFolded || current.isAllIn) return;
+      const pref = prefsRef.current[current.id] || 'check-fold';
+      const { action, amount } = computeTimeoutAction(s, current.id, pref);
+      const next = applyAction(s, current.id, action, amount);
+      if (next !== s) {
+        const stamped = { ...next, log: [...next.log, `⏱ ${current.name} auto-${action} (timeout)`].slice(-30) };
+        setState(stamped);
+        broadcastState(stamped);
+      }
+    }, 500);
+    return () => clearInterval(id);
+  }, [isHost, broadcastState]);
+
+  const setDefaultPref = useCallback((p: DefaultPref) => {
+    localStorage.setItem('poker_default_pref', p);
+    setDefaultPrefState(p);
+  }, []);
+
   return {
     identity,
     setName,
@@ -228,5 +271,7 @@ export function useMultiplayerPokerRoom(): UseRoomResult {
     startHand: startHandAction,
     nextHand: startHandAction,
     act,
+    defaultPref,
+    setDefaultPref,
   };
 }
