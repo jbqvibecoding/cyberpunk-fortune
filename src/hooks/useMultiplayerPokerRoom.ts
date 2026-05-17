@@ -36,6 +36,8 @@ export interface UseRoomResult {
   startHand: () => void;
   nextHand: () => void;
   act: (action: RoomAction, amount?: number) => void;
+  defaultPref: DefaultPref;
+  setDefaultPref: (p: DefaultPref) => void;
 }
 
 export function useMultiplayerPokerRoom(): UseRoomResult {
@@ -44,9 +46,11 @@ export function useMultiplayerPokerRoom(): UseRoomResult {
   const [state, setState] = useState<RoomState>(createWaitingState());
   const [connected, setConnected] = useState(false);
   const [presentIds, setPresentIds] = useState<string[]>([]);
+  const [defaultPref, setDefaultPrefState] = useState<DefaultPref>(() => (localStorage.getItem('poker_default_pref') as DefaultPref) || 'check-fold');
   const channelRef = useRef<RealtimeChannel | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const prefsRef = useRef<Record<string, DefaultPref>>({});
 
   const isHost = presentIds.length > 0 && presentIds[0] === identity.id;
   const isHostRef = useRef(isHost);
