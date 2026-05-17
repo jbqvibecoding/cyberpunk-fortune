@@ -245,9 +245,11 @@
     box-shadow: 0 0 12px hsl(187 100% 60% / 0.6);
     animation: scan 4.5s linear infinite;
   }
+}
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: hsl(var(--background)); }
 ::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.4); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.7); }
+
