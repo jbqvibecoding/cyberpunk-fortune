@@ -3,6 +3,7 @@ import { Check, ExternalLink, Loader2, Copy, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 import type { VerifiableDealRecord, DealPhase } from '@/hooks/useVerifiableDeal';
 import { CONTRACTS } from '@/lib/contracts/addresses';
+import { useExplorer } from '@/lib/explorer';
 import { toast } from 'sonner';
 
 interface Props {
@@ -12,7 +13,6 @@ interface Props {
   phase?: DealPhase;
 }
 
-const EXPLORER = 'https://sepolia.etherscan.io';
 
 const steps: { label: string; doneAt: DealPhase[]; activeAt: DealPhase }[] = [
   { label: '链上开局', doneAt: ['started','committing','committed','revealing','revealed','ready'], activeAt: 'starting' },
@@ -34,6 +34,7 @@ interface Row {
 
 export default function FairnessModal({ open, onOpenChange, record, phase = 'idle' }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
+  const explorer = useExplorer();
   const hasData = !!record && phase !== 'idle';
 
   const copy = async (val: string, key: string) => {
@@ -49,8 +50,8 @@ export default function FairnessModal({ open, onOpenChange, record, phase = 'idl
 
   const linkFor = (row: Row): string | null => {
     if (!row.v) return null;
-    if (row.kind === 'tx') return `${EXPLORER}/tx/${row.v}`;
-    if (row.kind === 'address') return `${EXPLORER}/address/${row.v}`;
+    if (row.kind === 'tx') return explorer.tx(row.v);
+    if (row.kind === 'address') return explorer.address(row.v);
     return null;
   };
 
@@ -72,12 +73,11 @@ export default function FairnessModal({ open, onOpenChange, record, phase = 'idl
       ];
 
   const primaryExplorer =
-    record?.revealTx ? `${EXPLORER}/tx/${record.revealTx}` :
-    record?.commitTx ? `${EXPLORER}/tx/${record.commitTx}` :
-    record?.startTx  ? `${EXPLORER}/tx/${record.startTx}`  :
-    null;
+    explorer.tx(record?.revealTx) ??
+    explorer.tx(record?.commitTx) ??
+    explorer.tx(record?.startTx);
 
-  const contractReadUrl = `${EXPLORER}/address/${CONTRACTS.SimplePoker}#readContract`;
+  const contractReadUrl = explorer.readContract(CONTRACTS.SimplePoker);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -148,7 +148,7 @@ export default function FairnessModal({ open, onOpenChange, record, phase = 'idl
                         target="_blank"
                         rel="noreferrer"
                         className="p-1.5 rounded hover:bg-secondary/15 text-muted-foreground hover:text-secondary transition-colors"
-                        title="在 Sepolia Etherscan 查看"
+                        title={`在 ${explorer.chainName} ${explorer.name} 查看`}
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
@@ -162,7 +162,7 @@ export default function FairnessModal({ open, onOpenChange, record, phase = 'idl
           <p className="text-[11px] font-cn text-muted-foreground leading-relaxed">
             发牌种子 = keccak256(clientSeed ‖ resultHash)。点击右侧
             <ExternalLink className="inline h-3 w-3 mx-0.5" />
-            可在 Sepolia Etherscan 上验证每一笔交易，或调用
+            可在 {explorer.chainName} {explorer.name} 上验证每一笔交易，或调用
             <code className="font-mono text-foreground/80 mx-1">getGameInfo(gameId)</code>
             重新推导发牌种子。
           </p>
