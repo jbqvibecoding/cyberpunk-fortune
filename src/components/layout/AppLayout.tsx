@@ -1,8 +1,9 @@
 import { ReactNode, useState } from 'react';
 import AppSidebar from './AppSidebar';
-import { ShieldCheck, Wallet, Menu } from 'lucide-react';
+import { ShieldCheck, Wallet, Menu, ChevronDown, AlertTriangle } from 'lucide-react';
 import WalletModal from '@/components/modals/WalletModal';
 import { NavLink, useLocation } from 'react-router-dom';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 const navItems = [
   { to: '/lobby', label: '大厅' },
