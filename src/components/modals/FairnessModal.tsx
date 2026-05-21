@@ -228,31 +228,36 @@ export default function FairnessModal({ open, onOpenChange, record, phase = 'idl
 
           {/* Actions */}
           {(() => {
+            const txEntries: { label: string; hash: Hex | null | undefined }[] = [
+              { label: '开局',   hash: record?.startTx },
+              { label: '承诺',   hash: record?.commitTx },
+              { label: '揭示',   hash: record?.revealTx },
+            ];
             const verifyTargets = [
-              { label: '开局 Tx', url: explorer.tx(record?.startTx) },
-              { label: '承诺 Tx', url: explorer.tx(record?.commitTx) },
-              { label: '揭示 Tx', url: explorer.tx(record?.revealTx) },
+              ...txEntries.map(t => ({ label: `${t.label} Tx`, url: explorer.tx(t.hash) })),
               { label: 'getGameInfo', url: contractReadUrl },
-            ].filter(t => !!t.url) as { label: string; url: string }[];
+            ].map(t => ({ ...t, enabled: !!t.url }));
+            const enabledCount = verifyTargets.filter(t => t.enabled).length;
 
             const oneClickVerify = () => {
-              if (verifyTargets.length === 0) {
+              const targets = verifyTargets.filter(t => t.enabled);
+              if (targets.length === 0) {
                 toast.error('暂无可验证的交易');
                 return;
               }
               let blocked = 0;
-              verifyTargets.forEach(t => {
-                const w = window.open(t.url, '_blank', 'noopener,noreferrer');
+              targets.forEach(t => {
+                const w = window.open(t.url!, '_blank', 'noopener,noreferrer');
                 if (!w) blocked++;
               });
               if (blocked > 0) {
-                toast.warning(`已打开 ${verifyTargets.length - blocked} / ${verifyTargets.length} 个标签，请允许浏览器弹窗后重试`);
+                toast.warning(`已打开 ${targets.length - blocked} / ${targets.length} 个标签，请允许浏览器弹窗后重试`);
               } else {
-                toast.success(`已在 ${verifyTargets.length} 个标签中打开${explorer.name}`);
+                toast.success(`已在 ${targets.length} 个标签中打开${explorer.name}`);
               }
             };
 
-            const canVerify = verifyTargets.length >= 2; // need at least one tx + getGameInfo
+            const canVerify = enabledCount >= 2;
 
             return (
               <div className="space-y-2">
@@ -260,30 +265,39 @@ export default function FairnessModal({ open, onOpenChange, record, phase = 'idl
                   onClick={oneClickVerify}
                   disabled={!canVerify}
                   className={`cyber-btn-neon w-full !py-2.5 !text-xs ${!canVerify ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={canVerify ? `在 ${verifyTargets.length} 个标签中打开全部凭证` : '等待链上交易完成后可用'}
+                  title={canVerify ? `在 ${enabledCount} 个标签中打开全部凭证` : '等待链上交易完成后可用'}
                 >
                   <ShieldCheck className="h-4 w-4" />
-                  一键验证（{verifyTargets.length} 个标签）
+                  一键验证（{enabledCount} / {verifyTargets.length} 个标签）
                 </button>
-                <div className="grid grid-cols-2 gap-2">
-                  <a
-                    href={primaryExplorer ?? '#'}
-                    target={primaryExplorer ? '_blank' : undefined}
-                    rel="noreferrer"
-                    aria-disabled={!primaryExplorer}
-                    onClick={e => { if (!primaryExplorer) e.preventDefault(); }}
-                    className={`cyber-btn-ghost !py-2 !text-xs ${!primaryExplorer ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" /> 查看最近交易
-                  </a>
-                  <a
-                    href={contractReadUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cyber-btn-ghost !py-2 !text-xs"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" /> 调用 getGameInfo
-                  </a>
+
+                {/* Per-tx confirmation status + block height */}
+                <div className="rounded-lg border border-border bg-background/60 divide-y divide-border/60">
+                  {txEntries.map(t => (
+                    <TxStatusRow key={t.label} label={t.label} hash={t.hash ?? null} explorer={explorer} />
+                  ))}
+                </div>
+
+                {/* Tab toggles — disable unavailable ones */}
+                <div className="flex flex-wrap gap-1.5">
+                  {verifyTargets.map(t => (
+                    <a
+                      key={t.label}
+                      href={t.enabled ? t.url! : '#'}
+                      target={t.enabled ? '_blank' : undefined}
+                      rel="noreferrer"
+                      aria-disabled={!t.enabled}
+                      onClick={e => { if (!t.enabled) e.preventDefault(); }}
+                      title={t.enabled ? `在 ${explorer.name} 打开 ${t.label}` : `${t.label} 尚未就绪`}
+                      className={`px-2.5 py-1 rounded border text-[10px] font-mono inline-flex items-center gap-1 transition-colors ${
+                        t.enabled
+                          ? 'border-secondary/40 text-secondary hover:bg-secondary/10'
+                          : 'border-border text-muted-foreground/60 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <ExternalLink className="h-3 w-3" /> {t.label}
+                    </a>
+                  ))}
                 </div>
               </div>
             );
