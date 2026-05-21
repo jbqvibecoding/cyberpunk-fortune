@@ -22,6 +22,32 @@ export function shuffleDeck(deck: Card[]): Card[] {
   return shuffled;
 }
 
+/**
+ * Deterministic Fisher-Yates shuffle seeded from a hex string
+ * (e.g. on-chain bytes32 like "0xabc123..."). Same seed → same deck.
+ */
+export function seededShuffle(deck: Card[], seedHex: string): Card[] {
+  const clean = seedHex.startsWith('0x') ? seedHex.slice(2) : seedHex;
+  let state = 0x9e3779b9 >>> 0;
+  for (let i = 0; i < clean.length; i += 2) {
+    const byte = parseInt(clean.slice(i, i + 2) || '0', 16);
+    state = ((state ^ byte) * 0x01000193) >>> 0;
+  }
+  const rand = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const shuffled = [...deck];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export function dealCards(deck: Card[], count: number): { cards: Card[]; remainingDeck: Card[] } {
   const cards = deck.slice(0, count);
   const remainingDeck = deck.slice(count);
