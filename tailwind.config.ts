@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Orbitron', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
+        display: ['Orbitron', 'Noto Sans SC', 'sans-serif'],
+        body: ['Inter', 'Noto Sans SC', 'sans-serif'],
+        cn: ['"Noto Sans SC"', 'sans-serif'],
         mono: ['Share Tech Mono', 'monospace'],
       },
       colors: {
