@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Check, ExternalLink, Loader2, Copy, CheckCircle2 } from 'lucide-react';
+import { Check, ExternalLink, Loader2, Copy, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import type { VerifiableDealRecord, DealPhase } from '@/hooks/useVerifiableDeal';
 import { CONTRACTS } from '@/lib/contracts/addresses';
@@ -168,26 +168,67 @@ export default function FairnessModal({ open, onOpenChange, record, phase = 'idl
           </p>
 
           {/* Actions */}
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={primaryExplorer ?? '#'}
-              target={primaryExplorer ? '_blank' : undefined}
-              rel="noreferrer"
-              aria-disabled={!primaryExplorer}
-              onClick={e => { if (!primaryExplorer) e.preventDefault(); }}
-              className={`cyber-btn-neon !py-2 !text-xs ${!primaryExplorer ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> 查看最近交易
-            </a>
-            <a
-              href={contractReadUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="cyber-btn-neon !py-2 !text-xs"
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> 调用 getGameInfo
-            </a>
-          </div>
+          {(() => {
+            const verifyTargets = [
+              { label: '开局 Tx', url: explorer.tx(record?.startTx) },
+              { label: '承诺 Tx', url: explorer.tx(record?.commitTx) },
+              { label: '揭示 Tx', url: explorer.tx(record?.revealTx) },
+              { label: 'getGameInfo', url: contractReadUrl },
+            ].filter(t => !!t.url) as { label: string; url: string }[];
+
+            const oneClickVerify = () => {
+              if (verifyTargets.length === 0) {
+                toast.error('暂无可验证的交易');
+                return;
+              }
+              let blocked = 0;
+              verifyTargets.forEach(t => {
+                const w = window.open(t.url, '_blank', 'noopener,noreferrer');
+                if (!w) blocked++;
+              });
+              if (blocked > 0) {
+                toast.warning(`已打开 ${verifyTargets.length - blocked} / ${verifyTargets.length} 个标签，请允许浏览器弹窗后重试`);
+              } else {
+                toast.success(`已在 ${verifyTargets.length} 个标签中打开${explorer.name}`);
+              }
+            };
+
+            const canVerify = verifyTargets.length >= 2; // need at least one tx + getGameInfo
+
+            return (
+              <div className="space-y-2">
+                <button
+                  onClick={oneClickVerify}
+                  disabled={!canVerify}
+                  className={`cyber-btn-neon w-full !py-2.5 !text-xs ${!canVerify ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={canVerify ? `在 ${verifyTargets.length} 个标签中打开全部凭证` : '等待链上交易完成后可用'}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  一键验证（{verifyTargets.length} 个标签）
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={primaryExplorer ?? '#'}
+                    target={primaryExplorer ? '_blank' : undefined}
+                    rel="noreferrer"
+                    aria-disabled={!primaryExplorer}
+                    onClick={e => { if (!primaryExplorer) e.preventDefault(); }}
+                    className={`cyber-btn-ghost !py-2 !text-xs ${!primaryExplorer ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> 查看最近交易
+                  </a>
+                  <a
+                    href={contractReadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="cyber-btn-ghost !py-2 !text-xs"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> 调用 getGameInfo
+                  </a>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </DialogContent>
     </Dialog>
