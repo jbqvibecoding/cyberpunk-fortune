@@ -48,6 +48,7 @@ const App = () => (
           </AppLayout>
         </BrowserRouter>
       </TooltipProvider>
+      </RainbowKitProvider>
     </QueryClientProvider>
   </WagmiProvider>
 );
