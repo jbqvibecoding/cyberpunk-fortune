@@ -13,7 +13,6 @@ interface Props {
   phase?: DealPhase;
 }
 
-const EXPLORER = 'https://sepolia.etherscan.io';
 
 const steps: { label: string; doneAt: DealPhase[]; activeAt: DealPhase }[] = [
   { label: '链上开局', doneAt: ['started','committing','committed','revealing','revealed','ready'], activeAt: 'starting' },
