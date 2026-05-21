@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWatchContractEvent } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { GameState, GameActions, Player, Card, PlayerAction, GamePhase } from '@/lib/poker/types';
-import { createDeck, shuffleDeck, dealCards } from '@/lib/poker/deck';
+import { createDeck, shuffleDeck, seededShuffle, dealCards } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/handEvaluator';
 import { getAIDecision, getAICommentary } from '@/lib/poker/aiPlayer';
 import { CONTRACTS, ZERO_ADDRESS } from '@/lib/contracts/addresses';
@@ -63,7 +63,10 @@ function createInitialState(buyIn: number): GameState {
 // Hook
 // ════════════════════════════════════════════════════════════════
 
-export function usePokerGame(buyIn: number = 1000): { state: GameState; actions: GameActions } {
+export function usePokerGame(
+  buyIn: number = 1000,
+  options: { dealSeed?: string | null } = {},
+): { state: GameState; actions: GameActions } {
   const { address, isConnected } = useAccount();
   const isContractDeployed = CONTRACTS.SimplePoker !== ZERO_ADDRESS;
   const isOnChain = isConnected && isContractDeployed;
@@ -392,7 +395,13 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
     }
 
     // Local simulation (always runs for UX)
-    const deck = shuffleDeck(createDeck());
+    // Local simulation (always runs for UX). When a verified on-chain seed
+    // is provided, shuffle deterministically so the same seed always
+    // produces the same deal — and anyone can recompute it.
+    const baseDeck = createDeck();
+    const deck = options.dealSeed
+      ? seededShuffle(baseDeck, options.dealSeed)
+      : shuffleDeck(baseDeck);
     const { cards: playerCards, remainingDeck: deck1 } = dealCards(deck, 2);
     const { cards: aiCards, remainingDeck: deck2 } = dealCards(deck1, 2);
 
@@ -443,7 +452,7 @@ export function usePokerGame(buyIn: number = 1000): { state: GameState; actions:
         tiedPlayers: undefined,
       };
     });
-  }, [isOnChain, writeContract]);
+  }, [isOnChain, writeContract, options.dealSeed]);
 
   const fold = useCallback(() => {
     const current = state.players[state.currentPlayerIndex];
