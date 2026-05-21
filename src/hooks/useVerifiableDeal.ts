@@ -94,7 +94,7 @@ export function useVerifiableDeal() {
     let cancelled = false;
     (async () => {
       try {
-        const info: any = await publicClient.readContract({
+        const info: any = await (publicClient as any).readContract({
           address: CONTRACTS.SimplePoker,
           abi: SimplePokerABI,
           functionName: 'getGameInfo',
@@ -133,7 +133,7 @@ export function useVerifiableDeal() {
         setRecord(r => ({ ...r, clientSeed, commitHash }));
         setPhase('committing');
         stage.current = 'commit';
-        const tx = await writeContractAsync({
+        const tx = await (writeContractAsync as any)({
           address: CONTRACTS.SimplePoker,
           abi: SimplePokerABI,
           functionName: 'commitAction',
@@ -155,7 +155,7 @@ export function useVerifiableDeal() {
       try {
         setPhase('revealing');
         stage.current = 'reveal';
-        const tx = await writeContractAsync({
+        const tx = await (writeContractAsync as any)({
           address: CONTRACTS.SimplePoker,
           abi: SimplePokerABI,
           functionName: 'revealAction',
@@ -181,7 +181,7 @@ export function useVerifiableDeal() {
     try {
       setPhase('starting');
       stage.current = 'start';
-      const tx = await writeContractAsync({
+      const tx = await (writeContractAsync as any)({
         address: CONTRACTS.SimplePoker,
         abi: SimplePokerABI,
         functionName: 'startGame',
