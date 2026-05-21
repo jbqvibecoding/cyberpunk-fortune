@@ -1,10 +1,69 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Check, ExternalLink, Loader2, Copy, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Check, ExternalLink, Loader2, Copy, CheckCircle2, ShieldCheck, XCircle, Clock } from 'lucide-react';
 import { useState } from 'react';
+import { useWaitForTransactionReceipt } from 'wagmi';
+import type { Hex } from 'viem';
 import type { VerifiableDealRecord, DealPhase } from '@/hooks/useVerifiableDeal';
 import { CONTRACTS } from '@/lib/contracts/addresses';
-import { useExplorer } from '@/lib/explorer';
+import { useExplorer, type ExplorerInfo } from '@/lib/explorer';
 import { toast } from 'sonner';
+
+/** Per-tx confirmation row: shows status + block height, links to explorer when available. */
+function TxStatusRow({
+  label, hash, explorer,
+}: { label: string; hash?: Hex | null; explorer: ExplorerInfo }) {
+  const enabled = !!hash;
+  const { data, isLoading, isError } = useWaitForTransactionReceipt({
+    hash: hash ?? undefined,
+    query: { enabled },
+  });
+
+  let icon = <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
+  let statusText = '待发起';
+  let statusClass = 'text-muted-foreground';
+  if (enabled) {
+    if (isLoading || !data) {
+      icon = <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />;
+      statusText = '确认中…';
+      statusClass = 'text-primary';
+    } else if (isError || data.status === 'reverted') {
+      icon = <XCircle className="h-3.5 w-3.5 text-destructive" />;
+      statusText = '失败';
+      statusClass = 'text-destructive';
+    } else {
+      icon = <CheckCircle2 className="h-3.5 w-3.5 text-secondary" />;
+      statusText = '已确认';
+      statusClass = 'text-secondary';
+    }
+  }
+
+  const block = data?.blockNumber != null ? `#${data.blockNumber.toString()}` : '—';
+  const link = explorer.tx(hash);
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 text-[11px]">
+      {icon}
+      <span className="font-cn w-16 shrink-0 text-foreground/80">{label}</span>
+      <span className={`font-mono w-16 shrink-0 ${statusClass}`}>{statusText}</span>
+      <span className="font-mono flex-1 text-muted-foreground truncate">区块 {block}</span>
+      {link ? (
+        <a
+          href={link}
+          target="_blank"
+          rel="noreferrer"
+          className="p-1 rounded hover:bg-secondary/15 text-muted-foreground hover:text-secondary transition-colors"
+          title={`在 ${explorer.name} 查看`}
+        >
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      ) : (
+        <span className="p-1 opacity-30 cursor-not-allowed" title="等待交易上链">
+          <ExternalLink className="h-3 w-3" />
+        </span>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   open: boolean;
