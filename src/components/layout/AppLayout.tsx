@@ -39,17 +39,60 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
           <div className="flex-1" />
 
-          <button
-            onClick={() => setWalletOpen(true)}
-            className="cyber-btn-ghost !py-2 !px-3 text-xs"
-            title="钱包可选，仅用于验证发牌公平性"
-          >
-            <Wallet className="h-4 w-4" />
-            <span className="hidden sm:inline">连接钱包</span>
-            <span className="hidden md:inline text-[10px] text-muted-foreground normal-case tracking-normal font-cn">
-              （仅验证公平性）
-            </span>
-          </button>
+          <ConnectButton.Custom>
+            {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+              const ready = mounted;
+              const connected = ready && account && chain;
+              return (
+                <div
+                  {...(!ready && { 'aria-hidden': true, style: { opacity: 0, pointerEvents: 'none', userSelect: 'none' } })}
+                  className="flex items-center gap-2"
+                >
+                  {!connected ? (
+                    <button
+                      onClick={openConnectModal}
+                      className="cyber-btn-ghost !py-2 !px-3 text-xs"
+                      title="可选：仅用于验证发牌公平性"
+                    >
+                      <Wallet className="h-4 w-4" />
+                      <span className="hidden sm:inline font-cn">连接钱包</span>
+                    </button>
+                  ) : chain.unsupported ? (
+                    <button
+                      onClick={openChainModal}
+                      className="cyber-btn-ghost !py-2 !px-3 text-xs border-destructive/60 text-destructive"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="font-cn">网络错误</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={openChainModal}
+                        className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-secondary/40 bg-secondary/10 hover:bg-secondary/20 transition-colors font-mono text-[10px] tracking-widest text-secondary"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                        {chain.name?.toUpperCase()}
+                      </button>
+                      <button
+                        onClick={openAccountModal}
+                        className="cyber-btn-ghost !py-2 !px-3 text-xs"
+                      >
+                        <Wallet className="h-4 w-4" />
+                        <span className="font-mono">{account.displayName}</span>
+                        {account.displayBalance && (
+                          <span className="hidden sm:inline text-muted-foreground font-mono">
+                            · {account.displayBalance}
+                          </span>
+                        )}
+                        <ChevronDown className="h-3 w-3 opacity-60" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            }}
+          </ConnectButton.Custom>
 
           <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-secondary/40 bg-secondary/10">
             <ShieldCheck className="h-3.5 w-3.5 text-secondary" />
