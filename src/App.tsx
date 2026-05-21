@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
+import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
+import "@rainbow-me/rainbowkit/styles.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import LobbyPage from "@/pages/LobbyPage";
@@ -19,6 +21,14 @@ const queryClient = new QueryClient();
 const App = () => (
   <WagmiProvider config={config}>
     <QueryClientProvider client={queryClient}>
+      <RainbowKitProvider
+        theme={darkTheme({
+          accentColor: 'hsl(266 100% 50%)',
+          accentColorForeground: 'white',
+          borderRadius: 'medium',
+          overlayBlur: 'small',
+        })}
+      >
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -38,6 +48,7 @@ const App = () => (
           </AppLayout>
         </BrowserRouter>
       </TooltipProvider>
+      </RainbowKitProvider>
     </QueryClientProvider>
   </WagmiProvider>
 );
