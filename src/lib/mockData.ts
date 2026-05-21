@@ -240,12 +240,13 @@ export const bosses: Boss[] = [
 ];
 
 export const tables = [
-  { id: 't1', name: '新手村',   blinds: '50/100',   bosses: '孙宇晨',          seats: '3/6', tier: '入门' as TierName },
-  { id: 't2', name: '进阶局',   blinds: '100/200',  bosses: '拿破仑 · 奥特曼',  seats: '4/6', tier: '进阶' as TierName },
-  { id: 't3', name: '中坚厅',   blinds: '150/300',  bosses: '科比 · 松下',     seats: '4/6', tier: '中坚' as TierName },
-  { id: 't4', name: '硬核场',   blinds: '300/600',  bosses: '科比 · 达利欧',    seats: '5/6', tier: '硬核' as TierName },
-  { id: 't5', name: '价值殿堂', blinds: '200/400',  bosses: '巴菲特 · 松下',    seats: '5/6', tier: '宗师' as TierName },
-  { id: 't6', name: '传说桌',   blinds: '500/1000', bosses: '达利欧 · 毛泽东',  seats: '5/6', tier: '传说' as TierName },
+  { id: 't1', name: '新手村',     blinds: '50/100',   bosses: '孙宇晨 · 特朗普',     seats: '3/6', tier: '入门' as TierName },
+  { id: 't2', name: '进阶局',     blinds: '100/200',  bosses: '拿破仑 · Naval',      seats: '4/6', tier: '进阶' as TierName },
+  { id: 't3', name: '中坚厅',     blinds: '150/300',  bosses: 'Paul Graham · 特朗普', seats: '4/6', tier: '中坚' as TierName },
+  { id: 't4', name: '硬核场',     blinds: '300/600',  bosses: '马斯克 · 塔勒布 · 费曼', seats: '5/6', tier: '硬核' as TierName },
+  { id: 't5', name: '价值殿堂',   blinds: '200/400',  bosses: '巴菲特 · 芒格 · 乔布斯', seats: '5/6', tier: '宗师' as TierName },
+  { id: 't6', name: 'AI 宗师桌',  blinds: '500/1000', bosses: 'Ilya · Karpathy · 孙子', seats: '5/6', tier: '传说' as TierName },
+  { id: 't7', name: '传说桌',     blinds: '500/1000', bosses: '达利欧 · 毛泽东 · CZ',  seats: '5/6', tier: '传说' as TierName },
 ];
 
 // 我的画像（报告页用）
